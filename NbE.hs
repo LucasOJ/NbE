@@ -1,5 +1,5 @@
 import Prelude hiding ( lookup, empty )
-import Data.Map (empty,  insert, Map, mapKeys, lookup )
+import Data.Map ( empty,  insert, Map, mapKeys, lookup )
 import Utils ( lookupOrError )
 
 -- Syntax
@@ -13,8 +13,9 @@ data NormalForm = NfNeutralForm NeutralForm
                 | NfLam NormalForm
     deriving (Read, Show)
 
--- Expressions that can be reified (also normal forms)
+-- Expressions that can be reified (subset of normal forms)
 data NeutralForm = NeVar Int
+            -- change to level not index
                  | NeApp NeutralForm NormalForm
     deriving (Read, Show)
 
@@ -25,39 +26,46 @@ data V = Neutral NeutralForm
 -- Environment
 type Env = Map Int V
 
+type Context = (Env, Int)
+
 -- Converts syntax to semantics
-eval :: Expr -> Env -> V
-eval (ExpVar x) env = lookupOrVariable x env
-eval (ExpLam m) env = Function f where
-        f :: V -> V
-        f v = eval m env' where
-            env' = insert 0 v (mapKeys (+1) env)
-            -- ISSUE: Update environment with shifted de-bruijn index (doesn't quite work)
-
-eval (ExpApp m n) env = app (eval m env) (eval n env)
-
--- ISSUE: Is this correct?
--- If a variable is in the environment - fetch it
--- Otherwise return reflected variable (base case)
-lookupOrVariable :: Int -> Env-> V
-lookupOrVariable k m = case lookup k m of
+eval :: Expr -> Context -> V
+eval (ExpVar x) (env, _) = case lookup x env of
         Just x -> x
-        Nothing -> reflect (NeVar k)
-        -- + number of lambdas deep?
+            -- Bound variable
+        Nothing -> undefined
+            -- Free variable
+            -- should reflect into level?
+
+eval (ExpLam m) (env, absDepth) = Function f where
+        f :: V -> V
+        f v = eval m context' where
+            context' = (insert 0 v (mapKeys (+1) env), absDepth + 1)
+            -- under lambdaCount -> bound
+            -- otherwise -> free
+
+eval (ExpApp m n) context = app (eval m context) (eval n context)
         
 app :: V -> V -> V
-app (Function f) v = f v    
-app (Neutral n)  v = reflect (NeApp n (reify v))
+app (Function f) v = f v
+    -- Increase all indicies here, except one inserting?
+app (Neutral n)  v = Neutral (NeApp n (reify v))
+    -- Need to reify v since NeApp :: NeutralForm -> NormalForm -> NeutralForm
 
 reify :: V -> NormalForm
 reify (Neutral n)  = NfNeutralForm n
-reify (Function f) = NfLam (reify (app (Function f) (reflect (NeVar 0))))
+reify (Function f) = NfLam (reify (f (Neutral (NeVar 0))))
+    -- Inserts bound variables here
+    -- How to insert higher-level bound variables?
 
 reflect :: NeutralForm -> V
 reflect = Neutral
 
+
 normalise :: Expr -> Expr
-normalise exp = normalToExpr $ reify $ eval exp empty
+normalise exp = normalToExpr $ reify $ eval exp (empty, 0)
+
+--- Display
 
 normalToExpr :: NormalForm -> Expr
 normalToExpr (NfNeutralForm n) = neutralToExp n
@@ -78,16 +86,16 @@ k1 = ExpLam (ExpLam (ExpVar 1))
 k2 :: Expr
 k2 = ExpLam (ExpLam (ExpVar 0))
 
-
 --- Debug
 
---normalise k1 WRONG
---k1 (ExpVar 3) (ExpVar 4) RIGHT
+-- normalise k1 WRONG
+-- ISSUE: not renaming bound variables correctly
 
 {- 
     Why do we not need reflect in untyped version?
         eval doing reflection for us?
     Why do we not need reflect in intensional version?
         extentional vs intentional?
+    Can we only normalise closed expressions?
 
 -}
