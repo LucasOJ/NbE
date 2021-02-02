@@ -2,20 +2,23 @@ import Prelude hiding ( lookup, empty )
 import Data.Map ( empty,  insert, Map, mapKeys, lookup )
 import Utils ( lookupOrError )
 
+type Name = Int
+
+type NameState a = Name -> (a, Name)
+
 -- Syntax
-data Expr = ExpVar Int
-          | ExpLam Int Expr
+data Expr = ExpVar Name
+          | ExpLam Name Expr
           | ExpApp Expr Expr 
     deriving (Read, Show)
 
 -- Expressions with no reductions
 data NormalForm = NfNeutralForm NeutralForm
-                | NfLam Int NormalForm
+                | NfLam Name NormalForm
     deriving (Read, Show)
 
 -- Expressions that can be reified (subset of normal forms)
-data NeutralForm = NeVar Int
-            -- change to level not index
+data NeutralForm = NeVar Name
                  | NeApp NeutralForm NormalForm
     deriving (Read, Show)
 
@@ -24,45 +27,39 @@ data V = Neutral NeutralForm
        | Function (V -> V) 
 
 -- Environment
-type Env = Map Int V
+type Env = Map Name V
 
-type Context = (Env, Int)
+type Context = (Env, Name)
 
 -- Converts syntax to semantics
-eval :: Expr -> Env -> Int -> (V, Int)
+eval :: Expr -> Env -> NameState V
 eval (ExpVar x) env freshVar = (v, freshVar) where 
     v = case lookup x env of
         Just y -> y
             -- Bound variable
         Nothing -> Neutral (NeVar x)
             -- Free variable
-            -- should reflect into level?
 
 eval (ExpLam var m) env freshVar = (Function f, freshVar) where
         f :: V -> V
         f v = fst $ eval m env' freshVar where
             env' = insert var v env
-            -- under lambdaCount -> bound
-            -- otherwise -> free
 
 eval (ExpApp m n) env freshVar = app evalM evalN freshVar''
     where 
         (evalM, freshVar') = eval m env freshVar
         (evalN, freshVar'') = eval n env freshVar'
         
-app :: V -> V -> Int -> (V, Int)
+app :: V -> V -> NameState V
 app (Function f) v freshVar = (f v, freshVar)
-    -- Increase all indicies here, except one inserting?
 app (Neutral n)  v freshVar = (Neutral (NeApp n reifiedV), freshVar') where
     (reifiedV, freshVar') = reify v freshVar
     -- Need to reify v since NeApp :: NeutralForm -> NormalForm -> NeutralForm
 
-reify :: V -> Int -> (NormalForm, Int)
+reify :: V -> NameState NormalForm
 reify (Neutral n)  freshVar = (NfNeutralForm n, freshVar)
 reify (Function f) freshVar = (NfLam freshVar nf, freshVar')
     where (nf, freshVar') = reify (f (Neutral (NeVar freshVar))) (freshVar + 1)
-    -- Inserts bound variables here
-    -- How to insert higher-level bound variables?
 
 reflect :: NeutralForm -> V
 reflect = Neutral
@@ -92,16 +89,12 @@ k1 = ExpLam 0 (ExpLam 1 (ExpVar 0))
 k2 :: Expr
 k2 = ExpLam 0 (ExpLam 1 (ExpVar 1))
 
+omega :: Expr
+omega = ExpApp (ExpLam 0 (ExpApp (ExpVar 0) (ExpVar 0))) (ExpLam 0 (ExpApp (ExpVar 0) (ExpVar 0)))
+
 --- Debug
 
--- normalise k1 WRONG
--- ISSUE: not renaming bound variables correctly
 
 {- 
-    Why do we not need reflect in untyped version?
-        eval doing reflection for us?
-    Why do we not need reflect in intensional version?
-        extentional vs intentional?
-    Can we only normalise closed expressions?
-
+    extentional vs intentional?
 -}
