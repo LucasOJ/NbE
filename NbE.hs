@@ -2,14 +2,17 @@ import Prelude hiding ( lookup, empty )
 import Data.Map ( empty,  insert, Map, mapKeys, lookup )
 import Utils ( lookupOrError )
 
+import Control.Monad.State ( MonadState(get), State, modify, evalState )
+
 type Name = Int
 
-type NameState a = Name -> (a, Name)
+-- State monad for generating fresh variable names
+type FreshName = State Name
 
 -- Syntax
 data Expr = ExpVar Name
           | ExpLam Name Expr
-          | ExpApp Expr Expr 
+          | ExpApp Expr Expr
     deriving (Read, Show)
 
 -- Expressions with no reductions
@@ -17,56 +20,67 @@ data NormalForm = NfNeutralForm NeutralForm
                 | NfLam Name NormalForm
     deriving (Read, Show)
 
--- Expressions that can be reified (subset of normal forms)
+-- Expressions that can be reified (also contain no reductions)
 data NeutralForm = NeVar Name
                  | NeApp NeutralForm NormalForm
     deriving (Read, Show)
 
 -- Semantics
-data V = Neutral NeutralForm 
-       | Function (V -> V) 
+data V = Neutral NeutralForm
+       | Function (V -> V)
 
 -- Environment
 type Env = Map Name V
 
-type Context = (Env, Name)
-
 -- Converts syntax to semantics
-eval :: Expr -> Env -> NameState V
-eval (ExpVar x) env freshVar = (v, freshVar) where 
+eval :: Expr -> Env -> FreshName V
+eval (ExpVar x) env = return v where
     v = case lookup x env of
+        -- Bound variable, returns the semantic value bound to x in the environment
         Just y -> y
-            -- Bound variable
-        Nothing -> Neutral (NeVar x)
-            -- Free variable
-
-eval (ExpLam var m) env freshVar = (Function f, freshVar) where
-        f :: V -> V
-        f v = fst $ eval m env' freshVar where
-            env' = insert var v env
-
-eval (ExpApp m n) env freshVar = app evalM evalN freshVar''
-    where 
-        (evalM, freshVar') = eval m env freshVar
-        (evalN, freshVar'') = eval n env freshVar'
         
-app :: V -> V -> NameState V
-app (Function f) v freshVar = (f v, freshVar)
-app (Neutral n)  v freshVar = (Neutral (NeApp n reifiedV), freshVar') where
-    (reifiedV, freshVar') = reify v freshVar
-    -- Need to reify v since NeApp :: NeutralForm -> NormalForm -> NeutralForm
+        -- Free variable
+        Nothing -> Neutral (NeVar x)
+            
+eval (ExpLam var m) env = do
+    freshVar <- get
+    -- Semantic function interpretation of the lambda expression syntax
+    let f v = evalState (eval m env') freshVar where
+            -- Defines a new environment where semantic input to function bound to var (for the body of the lambda)
+            env' = insert var v env
+    return (Function f)
 
-reify :: V -> NameState NormalForm
-reify (Neutral n)  freshVar = (NfNeutralForm n, freshVar)
-reify (Function f) freshVar = (NfLam freshVar nf, freshVar')
-    where (nf, freshVar') = reify (f (Neutral (NeVar freshVar))) (freshVar + 1)
+eval (ExpApp m n) env = do
+    evalM <- eval m env
+    evalN <- eval n env
+    app evalM evalN
+
+-- Defines the application of semantic expressions
+app :: V -> V -> FreshName V
+-- Evaluates the semantic function f at v (ie evaluates redex)
+app (Function f) v = return (f v)
+-- If the application does not reduce, create a semantic application
+-- Need to reify v since NeApp :: NeutralForm -> NormalForm -> NeutralForm
+app (Neutral n)  v = do
+    reifiedV <- reify v
+    return (Neutral (NeApp n reifiedV))
+
+-- Converts a sematic representation of a term into it's associated normal form
+reify :: V -> FreshName NormalForm
+reify (Neutral n)  = return (NfNeutralForm n)
+reify (Function f) = do
+    freshVar <- get
+    -- Since we introduced a new bound variable the state is not longer fresh so increment it
+    modify (+1)
+    -- Reify the body of the semantic function when evaluated at the fresh bound variable
+    normalForm <- reify (f (Neutral (NeVar freshVar)))
+    return (NfLam freshVar normalForm)
 
 reflect :: NeutralForm -> V
 reflect = Neutral
 
 normalise :: Expr -> Expr
-normalise exp = normalToExpr $ fst $ reify v freshVar where
-    (v, freshVar) = eval exp empty 0 
+normalise exp = normalToExpr $ evalState (eval exp empty >>= reify) 0
 
 --- Display
 
@@ -91,10 +105,3 @@ k2 = ExpLam 0 (ExpLam 1 (ExpVar 1))
 
 omega :: Expr
 omega = ExpApp (ExpLam 0 (ExpApp (ExpVar 0) (ExpVar 0))) (ExpLam 0 (ExpApp (ExpVar 0) (ExpVar 0)))
-
---- Debug
-
-
-{- 
-    extentional vs intentional?
--}
