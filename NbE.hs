@@ -4,13 +4,13 @@ import Utils ( lookupOrError )
 
 -- Syntax
 data Expr = ExpVar Int
-          | ExpLam Expr
+          | ExpLam Int Expr
           | ExpApp Expr Expr 
     deriving (Read, Show)
 
 -- Expressions with no reductions
 data NormalForm = NfNeutralForm NeutralForm
-                | NfLam NormalForm
+                | NfLam Int NormalForm
     deriving (Read, Show)
 
 -- Expressions that can be reified (subset of normal forms)
@@ -29,47 +29,53 @@ type Env = Map Int V
 type Context = (Env, Int)
 
 -- Converts syntax to semantics
-eval :: Expr -> Context -> V
-eval (ExpVar x) (env, _) = case lookup x env of
-        Just x -> x
+eval :: Expr -> Env -> Int -> (V, Int)
+eval (ExpVar x) env freshVar = (v, freshVar) where 
+    v = case lookup x env of
+        Just y -> y
             -- Bound variable
-        Nothing -> undefined
+        Nothing -> Neutral (NeVar x)
             -- Free variable
             -- should reflect into level?
 
-eval (ExpLam m) (env, absDepth) = Function f where
+eval (ExpLam var m) env freshVar = (Function f, freshVar) where
         f :: V -> V
-        f v = eval m context' where
-            context' = (insert 0 v (mapKeys (+1) env), absDepth + 1)
+        f v = fst $ eval m env' freshVar where
+            env' = insert var v env
             -- under lambdaCount -> bound
             -- otherwise -> free
 
-eval (ExpApp m n) context = app (eval m context) (eval n context)
+eval (ExpApp m n) env freshVar = app evalM evalN freshVar''
+    where 
+        (evalM, freshVar') = eval m env freshVar
+        (evalN, freshVar'') = eval n env freshVar'
         
-app :: V -> V -> V
-app (Function f) v = f v
+app :: V -> V -> Int -> (V, Int)
+app (Function f) v freshVar = (f v, freshVar)
     -- Increase all indicies here, except one inserting?
-app (Neutral n)  v = Neutral (NeApp n (reify v))
+app (Neutral n)  v freshVar = (Neutral (NeApp n reifiedV), freshVar') where
+    (reifiedV, freshVar') = reify v freshVar
     -- Need to reify v since NeApp :: NeutralForm -> NormalForm -> NeutralForm
 
-reify :: V -> NormalForm
-reify (Neutral n)  = NfNeutralForm n
-reify (Function f) = NfLam (reify (f (Neutral (NeVar 0))))
+reify :: V -> Int -> (NormalForm, Int)
+reify (Neutral n)  freshVar = (NfNeutralForm n, freshVar)
+reify (Function f) freshVar = (NfLam freshVar nf, freshVar')
+    where (nf, freshVar') = reify (f (Neutral (NeVar freshVar))) (freshVar + 1)
     -- Inserts bound variables here
     -- How to insert higher-level bound variables?
 
 reflect :: NeutralForm -> V
 reflect = Neutral
 
-
 normalise :: Expr -> Expr
-normalise exp = normalToExpr $ reify $ eval exp (empty, 0)
+normalise exp = normalToExpr $ fst $ reify v freshVar where
+    (v, freshVar) = eval exp empty 0 
 
 --- Display
 
 normalToExpr :: NormalForm -> Expr
 normalToExpr (NfNeutralForm n) = neutralToExp n
-normalToExpr (NfLam n) = ExpLam (normalToExpr n)
+normalToExpr (NfLam var n) = ExpLam var (normalToExpr n)
 
 neutralToExp :: NeutralForm -> Expr
 neutralToExp (NeVar i) = ExpVar i
@@ -78,13 +84,13 @@ neutralToExp (NeApp n m) = ExpApp (neutralToExp n) (normalToExpr m)
 --- Combinators
 
 identity :: Expr
-identity = ExpLam (ExpVar 0)
+identity = ExpLam 0 (ExpVar 0)
 
 k1 :: Expr
-k1 = ExpLam (ExpLam (ExpVar 1))
+k1 = ExpLam 0 (ExpLam 1 (ExpVar 0))
 
 k2 :: Expr
-k2 = ExpLam (ExpLam (ExpVar 0))
+k2 = ExpLam 0 (ExpLam 1 (ExpVar 1))
 
 --- Debug
 
