@@ -1,16 +1,11 @@
 import Prelude hiding ( lookup, empty )
 import Data.Map ( empty,  insert, Map, mapKeys, lookup )
-
 import Control.Monad.State ( MonadState(get), State, modify, evalState )
 import Data.Set ( Set, singleton, delete, union, notMember )
 
-type Name = Int
+import TypeDeclarations ( DbExpr(DbVar, DbApp, DbLam) )
 
--- Syntax
-data Expr = ExpVar Name
-          | ExpLam Expr
-          | ExpApp Expr Expr
-    deriving (Read, Show)
+type Name = Int
 
 -- Expressions with no reductions
 data NormalForm = NfNeutralForm NeutralForm
@@ -35,8 +30,8 @@ type Env = Map Name V
 -- Core NbE
 
 -- Converts epxression syntax to semantics
-eval :: Env -> Expr -> V
-eval env (ExpVar x) = case lookup x env of
+eval :: Env -> DbExpr -> V
+eval env (DbVar x) = case lookup x env of
         -- Bound variable, returns the semantic value bound to x in the environment
         Just y -> y
 
@@ -44,12 +39,12 @@ eval env (ExpVar x) = case lookup x env of
         -- TODO: What to do with free variables?
         Nothing -> undefined
 
-eval env (ExpLam m) = Function f where
+eval env (DbLam m) = Function f where
         f :: V -> V
         f v = eval env' m where
             env' = insert 0 v (mapKeys (+1) env)
 
-eval env (ExpApp m n) = app (eval env m) (eval env n)
+eval env (DbApp m n) = app (eval env m) (eval env n)
 
 -- Defines the application of semantic expressions
 app :: V -> V -> V
@@ -57,42 +52,47 @@ app :: V -> V -> V
 app (Function f) v = f v
 -- If the application does not reduce, create a semantic application
 -- Need to reify v since NeApp :: NeutralForm -> NormalForm -> NeutralForm
+-- Key difference -> Don't need to reify here (just does structural application)
 app (Neutral m)  v = Neutral (NeVApp m v)
 
--- Converts a sematic representation of a term into it's associated normal form
+-- Converts a sematic representation of a term into its associated normal form
 reify :: Int -> V -> NormalForm
+-- Reifies a function by evaluating the function at the nth dB level
+-- We increment by 1 since n represents the maximum number of free variables (we have introduced a new one)
 reify n (Function f) = NfLam (reify (n + 1) (f (Neutral (NeVLevel n))))
 reify n (Neutral m)  = NfNeutralForm (reifyNeutral n m)
 
+-- Converts a sematic neutral into its associated sytactic neutral form
 reifyNeutral :: Int -> NeutralV -> NeutralForm
+-- Converts a semantic deBruijn level into a sytactic deBruijn variable
 reifyNeutral n (NeVLevel k) = NeVar (n - 1 - k)
 reifyNeutral n (NeVApp p q) = NeApp (reifyNeutral n p) (reify n q)
 
-normalise :: Expr -> Expr
-normalise = normalToExpr . reify 0 . eval empty
+normaliseDbExpr :: DbExpr -> DbExpr
+normaliseDbExpr = normalToExpr . reify 0 . eval empty
 
 --- Display
 
 -- Converts normal forms back to the expression syntax
-normalToExpr :: NormalForm -> Expr
+normalToExpr :: NormalForm -> DbExpr
 normalToExpr (NfNeutralForm n) = neutralToExp n
-normalToExpr (NfLam n) = ExpLam (normalToExpr n)
+normalToExpr (NfLam n) = DbLam (normalToExpr n)
 
 -- Converts neutral forms back to the expression syntax
-neutralToExp :: NeutralForm -> Expr
-neutralToExp (NeVar i) = ExpVar i
-neutralToExp (NeApp n m) = ExpApp (neutralToExp n) (normalToExpr m)
+neutralToExp :: NeutralForm -> DbExpr
+neutralToExp (NeVar i) = DbVar i
+neutralToExp (NeApp n m) = DbApp (neutralToExp n) (normalToExpr m)
 
 --- Combinators
 
-identity :: Expr
-identity = ExpLam (ExpVar 0)
+identity :: DbExpr 
+identity = DbLam (DbVar 0)
 
-k1 :: Expr
-k1 = ExpLam (ExpLam (ExpVar 1))
+k1 :: DbExpr 
+k1 = DbLam (DbLam (DbVar 1))
 
-k2 :: Expr
-k2 = ExpLam (ExpLam (ExpVar 0))
+k2 :: DbExpr 
+k2 = DbLam (DbLam (DbVar 0))
 
-omega :: Expr
-omega = ExpApp (ExpLam (ExpApp (ExpVar 0) (ExpVar 0))) (ExpLam (ExpApp (ExpVar 0) (ExpVar 0)))
+omega :: DbExpr 
+omega = DbApp (DbLam (DbApp (DbVar 0) (DbVar 0))) (DbLam (DbApp (DbVar 0) (DbVar 0)))
