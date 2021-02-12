@@ -1,11 +1,11 @@
 import Prelude hiding ( lookup, empty )
-import Data.Map ( empty,  insert, Map, mapKeys, lookup )
+import Data.Map (  insert, Map, mapKeys, lookup)
+import qualified Data.Map as Map ( fromList )
 import Control.Monad.State ( MonadState(get), State, modify, evalState )
-import Data.Set ( Set, singleton, delete, union, notMember )
-
-import TypeDeclarations ( DbExpr(DbVar, DbApp, DbLam) )
-
-type Name = Int
+import Data.Set ( Set, singleton, delete, union, notMember, toList )
+import qualified Data.Set as Set (size)
+import Utils
+import TypeDeclarations
 
 -- Expressions with no reductions
 data NormalForm = NfNeutralForm NeutralForm
@@ -13,7 +13,7 @@ data NormalForm = NfNeutralForm NeutralForm
     deriving (Read, Show)
 
 -- Expressions that can be reified (also contain no reductions)
-data NeutralForm = NeVar Name
+data NeutralForm = NeVar Int
                  | NeApp NeutralForm NormalForm
     deriving (Read, Show)
 
@@ -25,9 +25,9 @@ data NeutralV = NeVLevel Int
               | NeVApp NeutralV V
 
 -- Environment
-type Env = Map Name V
+type Env = Map Int V
 
--- Core NbE
+---- Core NbE Functions
 
 -- Converts epxression syntax to semantics
 eval :: Env -> DbExpr -> V
@@ -68,31 +68,56 @@ reifyNeutral :: Int -> NeutralV -> NeutralForm
 reifyNeutral n (NeVLevel k) = NeVar (n - 1 - k)
 reifyNeutral n (NeVApp p q) = NeApp (reifyNeutral n p) (reify n q)
 
-normaliseDbExpr :: DbExpr -> DbExpr
-normaliseDbExpr = normalToExpr . reify 0 . eval empty
+---- Conversion back to standard deBruijn term
 
---- Display
-
--- Converts normal forms back to the expression syntax
+-- Converts normal forms back to the deBruijn expression syntax
 normalToExpr :: NormalForm -> DbExpr
 normalToExpr (NfNeutralForm n) = neutralToExp n
 normalToExpr (NfLam n) = DbLam (normalToExpr n)
 
--- Converts neutral forms back to the expression syntax
+-- Converts neutral forms back to the deBruijn expression syntax
 neutralToExp :: NeutralForm -> DbExpr
 neutralToExp (NeVar i) = DbVar i
 neutralToExp (NeApp n m) = DbApp (neutralToExp n) (normalToExpr m)
 
+---- Normalisation functions  
+
+-- Normalises a deBruijn expression given that it contains n free variables
+normaliseDbExpr :: Int -> DbExpr -> DbExpr
+normaliseDbExpr n = normalToExpr . reify n . eval initialEnv where
+    -- The first n deBruijn indicies correspond to the free variables
+    -- Their semantic representation is the final n deBruijn levels 
+    initialEnv = Map.fromList [(k, Neutral (NeVLevel (n - 1 - k))) | k <-[0..(n - 1)]] 
+
+-- Main NbE Function
+-- Given a string-named expression, produces the string named normal form
+normalise :: Expr -> Expr
+normalise expr = (deBruijnExprToExpr indexToName freshVariableStream 
+                  . normaliseDbExpr n 
+                  . exprToDeBruijnExpr nameToIndex) expr where
+
+    freeVariables = getFreeVariables expr
+
+    -- Needed for string-named to deBruijn conversion 
+    nameToIndex = getFreeVariableMapping freeVariables
+
+    -- Needed for normalisation of deBruijn terms
+    n = Set.size freeVariables
+    
+    -- Needed for deBruijn to string-named conversion
+    indexToName = invertMap nameToIndex
+    freshVariableStream = getFreshVariableStream freeVariables
+
 --- Combinators
 
-identity :: DbExpr 
-identity = DbLam (DbVar 0)
+identity :: Expr
+identity = ExpLam "x" (ExpVar "x")
 
-k1 :: DbExpr 
-k1 = DbLam (DbLam (DbVar 1))
+k1 :: Expr
+k1 = ExpLam "x" (ExpLam "y" (ExpVar "x"))
 
-k2 :: DbExpr 
-k2 = DbLam (DbLam (DbVar 0))
+k2 :: Expr
+k2 = ExpLam "x" (ExpLam "y" (ExpVar "y"))
 
-omega :: DbExpr 
-omega = DbApp (DbLam (DbApp (DbVar 0) (DbVar 0))) (DbLam (DbApp (DbVar 0) (DbVar 0)))
+omega :: Expr
+omega = ExpApp (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x"))) (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x")))
