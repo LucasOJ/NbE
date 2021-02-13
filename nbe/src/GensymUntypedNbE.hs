@@ -1,3 +1,5 @@
+
+module GensymUntypedNbE () where
 import Prelude hiding ( lookup, empty )
 import Data.Map ( empty,  insert, Map, mapKeys, lookup )
 
