@@ -1,6 +1,6 @@
-module TypeDeclarations ( 
-    Expr(ExpVar, ExpLam, ExpApp), 
-    DbExpr(DbVar, DbLam, DbApp), 
+module Untyped.TypeDeclarations ( 
+    Expr(..), 
+    DbExpr(..), 
     Name 
 ) where
 

@@ -1,13 +1,13 @@
 
-module DeBruijnUntypedNbE () where 
+module Untyped.DeBruijnNbE () where 
 import Prelude hiding ( lookup, empty )
 import Data.Map (  insert, Map, mapKeys, lookup)
 import qualified Data.Map as Map ( fromList )
 import Control.Monad.State ( MonadState(get), State, modify, evalState )
 import Data.Set ( Set, singleton, delete, union, notMember, toList )
 import qualified Data.Set as Set (size)
-import Utils
-import TypeDeclarations
+import Untyped.Utils
+import Untyped.TypeDeclarations
 
 -- Expressions with no reductions
 data NormalForm = NfNeutralForm NeutralForm

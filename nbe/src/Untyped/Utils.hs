@@ -1,6 +1,6 @@
-module Utils ( getFreeVariables, getFreeVariableMapping, invertMap, getFreshVariableStream, exprToDeBruijnExpr, deBruijnExprToExpr ) where
+module Untyped.Utils ( getFreeVariables, getFreeVariableMapping, invertMap, getFreshVariableStream, exprToDeBruijnExpr, deBruijnExprToExpr ) where
 import Data.Set ( Set, singleton, delete, union, notMember, toList )
-import TypeDeclarations
+import Untyped.TypeDeclarations
 import qualified Data.Map as Map (Map, fromList, toList, lookup, insert, empty, mapKeys) 
 import Data.Tuple (swap)
 

@@ -1,12 +1,12 @@
 
 {-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
-module TypedTypeDeclarations () where 
+module Monotyped.TypeDeclarations () where 
 
--- Variables
-type Variable = String
+-- TypeVariables
+type TypeVariable = String
 
 -- Representation of monotypes
-data Ty = TyVar Variable | Ty :-> Ty
+data Ty = TyVar TypeVariable | Ty :-> Ty
 
 
 -- Represents proof that a value is in a list
@@ -26,3 +26,15 @@ data Expr :: [Ty] -> Ty -> * where
     Lam :: Expr (arg ': ctx) result -> Expr ctx (arg :-> result)
     -- Given an expression applied to a term of function type, we can apply the argument to the function
     App :: Expr ctx (arg :-> result) -> Expr ctx arg -> Expr ctx result 
+
+
+-- https://www.seas.upenn.edu/~cis194/spring15/lectures/11-stlc.html
+
+data Type :: * -> * where
+    TVar   :: Type TypeVariable
+    TArrow  :: Type a -> Type b -> Type (a -> b)
+
+data Expr' :: * -> * where
+    Var' :: String -> Type a -> Expr' a
+    Lam' :: String -> Type a -> Expr' b -> Expr' (a -> b)
+    App' :: Expr' (a -> b) -> Expr' a -> Expr' b
