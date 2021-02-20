@@ -6,7 +6,7 @@ module Monotyped.TypeDeclarations () where
 type TypeVariable = String
 
 -- Representation of monotypes
-data Ty = TyVar TypeVariable | Ty :-> Ty
+data Ty = BaseTy | Arrow Ty Ty
 
 
 -- Represents proof that a value is in a list
@@ -23,18 +23,17 @@ data Expr :: [Ty] -> Ty -> * where
     -- Given a proof the type ty is in the context ctx we know it's a variable??
     Var :: IsElem ctx ty -> Expr ctx ty
     -- Given an expression and context, we can abstract out the first bound variable in the context to make a lambda
-    Lam :: Expr (arg ': ctx) result -> Expr ctx (arg :-> result)
+    Lam :: Expr (arg ': ctx) result -> Expr ctx (Arrow arg result)
     -- Given an expression applied to a term of function type, we can apply the argument to the function
-    App :: Expr ctx (arg :-> result) -> Expr ctx arg -> Expr ctx result 
+    App :: Expr ctx (Arrow arg result) -> Expr ctx arg -> Expr ctx result 
+
+exprToString :: Expr '[] t -> String
+exprToString = exprToString'
+
+exprToString' :: Expr ctx t -> String
+exprToString' (Var _) = "Var"
+exprToString' (Lam body) = "Lam ( " ++ exprToString' body ++ " )"
+exprToString' (App m n ) = "App " ++ exprToString' m ++ " " ++ exprToString' n
 
 
--- https://www.seas.upenn.edu/~cis194/spring15/lectures/11-stlc.html
-
-data Type :: * -> * where
-    TVar   :: Type TypeVariable
-    TArrow  :: Type a -> Type b -> Type (a -> b)
-
-data Expr' :: * -> * where
-    Var' :: String -> Type a -> Expr' a
-    Lam' :: String -> Type a -> Expr' b -> Expr' (a -> b)
-    App' :: Expr' (a -> b) -> Expr' a -> Expr' b
+--exprToString' :: Expr a t -> String
