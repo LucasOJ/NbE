@@ -13,9 +13,22 @@
 \maketitle
 
 \section{Introduction}
+\subsection{What is NbE?}
+Indentify common features - eval and reify, interpret by semantic set in "host" language
 
-\section{Untyped Lambda Calculus}
+Difference to reduction-based
 
+\subsection{Motivation for NbE}
+
+More efficient?
+
+Avoids infinite reduction (terms not strongly normalisable - eg K x omega)
+
+\subsection{Why NbE in Haskell?}
+
+Modern technqiues for elegant implementation (GADTs)
+
+\section{NbE for the Untyped Lambda Calculus}
 \subsection{Syntax}
 \begin{align}
     N_f &:= N_e \mid \lambda.N_f  \\
@@ -38,7 +51,7 @@ Implemented with State monad
 
 Issue with solution 1: Have to add monad everywhere (inescapable) - all functions dependent on state
 
-Obscures logic
+"Less functional" - carry around state (may as well use imperative)
 
 \subsection{Fresh variables solution 2 - Locally nameless terms}
 approach based on \cite{deBruijn}
@@ -48,10 +61,38 @@ Uses de Bruijn Indicies for syntax and deBruijn levels for semantics
 index n references nth abstraction,
 if m abstractions: if n < m bound variables, otherwise free variable
 
-\section{Typed Lambda Calculus}
-Based on GADTs \cite{GADTs}
+Shifting for abstractions
 
-\section{Modal Lambda Calculus}
+\section{Implementing the Typed Lambda Calculus}
+Problem: Only want to normalise well typed terms.
+Criteria: 
+(1) Exclude $\lambda x . y$ - y free variable so not in typing context
+(2) Exclude $\lambda x.xx$ - untypable (types are finite)
+
+Problem with standard terms - can't carry type information
+
+\subsection{Typed Term solution - GADTs}
+\cite{GADTs}
+Explicit type constructor arguments
+Language extensions:
+DataKinds, TypeOperators, PolyKinds, GADTs.
+
+Example 1: Vec 
+
+Justification of base type \textit{extension work??: string/integer type}
+Example 2: IsElem
+Example 3: Expr
+
+Big-step evalulator
+
+Input/Ouput type as pre-condition/post-condition (eg empty context)
+
+\textit{extension work: Introduce context at value level (parameter to function)} 
+
+Restricitions on Haskell
+Not full dependent types - need singleton pattern
+
+\section{NbE for the Typed Lambda Calculus}
 \cite{modalTypes}
 
 \printbibliography
