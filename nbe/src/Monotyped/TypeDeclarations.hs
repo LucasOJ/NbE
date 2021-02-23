@@ -2,12 +2,9 @@
 {-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
 module Monotyped.TypeDeclarations () where 
 
--- TypeVariables
-type TypeVariable = String
 
 -- Representation of monotypes
 data Ty = BaseTy | Arrow Ty Ty
-
 
 -- Represents proof that a value is in a list
 data Elem :: [a] -> a -> * where
@@ -15,7 +12,6 @@ data Elem :: [a] -> a -> * where
     Head :: Elem (x ': xs) x
     -- The proof is still valid is we prepend an element to the list
     Tail :: Elem xs x -> Elem (y ': xs) x
-
 
 -- Syntactic typed DeBruijn expressions
 -- Each of the values is a term, and its type contains the context and type of the term
@@ -41,16 +37,45 @@ data NeutralExpr :: [Ty] -> Ty -> * where
 
 -- Semantics
 data V :: [Ty] -> Ty -> * where 
-    Up :: NeutralExpr ctx ty -> V ctx ty
+    Up :: NeutralV ctx ty -> V ctx ty
 
-    -- TODO: CHECK THIS - other way around?
+    -- TODO: CHECK THIS
+    Function :: (V ctx arg -> V (arg ': ctx) result) -> V ctx (Arrow arg result)
 
-    Function :: V (arg ': ctx) result -> V ctx (Arrow arg result)
+data NeutralV :: [Ty] -> Ty -> * where 
+    -- Need to be element of context?
+    NeutralVVar :: Elem ctx ty -> NeutralV ctx ty
+    NeutralVApp :: NeutralV ctx (Arrow arg result) -> V ctx arg -> NeutralV ctx result 
 
--- This def?
-data V' :: [Ty] -> Ty -> * where
-    Up' :: NeutralExpr ctx ty -> V' ctx ty
-    Func :: (V'(arg ': ctx) result -> V' ctx (Arrow arg result)) -> V' ctx result 
+
+data Env :: [Ty] -> * where
+    Empty :: Env '[]
+    Shift :: V ctx ty -> Env types -> Env (ty : types)
+
+-- ty should remain the same always
+eval' :: Env ctx -> Expr ctx ty -> V ctx ty
+eval' env (Var elemProof) = undefined 
+eval' env (Lam body) = Function f where
+    f v = eval' env' body where
+        env' = Shift v env
+eval' env (App m n) = app (eval' env m) (eval' env n) 
+
+app :: V ctx (Arrow arg result) -> V ctx arg -> V ctx result 
+app (Function f) v = f v
+-- Do we need this case? Non-function appliation possible in typed lambda calc
+app (Up m) n = Up (NeutralVApp m n) 
+
+reify :: V ctx t -> NormalExpr ctx t
+reify (Function f) = undefined 
+reify (Up m) = undefined 
+
+reifyNeutral :: NeutralV ctx t -> NeutralExpr ctx t
+reifyNeutral (NeutralVVar elemProof) = undefined 
+reifyNeutral (NeutralVApp m n) = NeutralApp (reifyNeutral m) (reify n)
+
+--- Debug
+eval :: Expr '[] t -> V '[] t
+eval = undefined 
 
 isNormal :: NormalExpr '[] t -> Bool 
 isNormal _ = True
@@ -61,12 +86,15 @@ exprToString = exprToString'
 exprToString' :: Expr ctx t -> String
 exprToString' (Var _) = "Var"
 exprToString' (Lam body) = "Lam ( " ++ exprToString' body ++ " )"
-exprToString' (App m n ) = "App " ++ exprToString' m ++ " " ++ exprToString' n
+exprToString' (App m n) = "App " ++ exprToString' m ++ " " ++ exprToString' n
 
 -- TODO: How to represent environment and tie in with type environent in type?
 
-eval :: Expr '[] t -> V '[] t
-eval = undefined 
+elemToIndex :: Elem xs s -> Int
+elemToIndex Head = 0
+elemToIndex (Tail n) = 1 + elemToIndex n
+
+--- Combinators
 
 identity :: Expr ctx (Arrow a a)
 identity = Lam (Var Head)
