@@ -36,45 +36,48 @@ data NeutralExpr :: [Ty] -> Ty -> * where
     NeutralApp :: NeutralExpr ctx (Arrow arg result) -> NormalExpr ctx arg -> NeutralExpr ctx result
 
 -- Semantics
-data V :: [Ty] -> Ty -> * where 
-    Up :: NeutralV ctx ty -> V ctx ty
+data V :: Ty -> * where 
+    Up :: NeutralV ty -> V ty
 
     -- TODO: CHECK THIS
-    Function :: (V ctx arg -> V (arg ': ctx) result) -> V ctx (Arrow arg result)
+    Function :: (V arg -> V result) -> V (Arrow arg result)
 
-data NeutralV :: [Ty] -> Ty -> * where 
+data NeutralV :: Ty -> * where 
     -- Need to be element of context?
-    NeutralVVar :: Elem ctx ty -> NeutralV ctx ty
-    NeutralVApp :: NeutralV ctx (Arrow arg result) -> V ctx arg -> NeutralV ctx result 
-
+    NeutralVVar :: Elem ctx ty -> NeutralV ty
+    NeutralVApp :: NeutralV (Arrow arg result) -> V arg -> NeutralV result 
 
 data Env :: [Ty] -> * where
     Empty :: Env '[]
-    Shift :: V ctx ty -> Env types -> Env (ty : types)
+    Shift :: V ty -> Env types -> Env (ty : types)
+
+-- Since ty is an element of types, we will never call on the empty environment
+envLookup :: Elem types ty -> Env types -> V ty
+envLookup Head     (Shift v _)   = v
+envLookup (Tail n) (Shift _ env) = envLookup n env
 
 -- ty should remain the same always
-eval' :: Env ctx -> Expr ctx ty -> V ctx ty
-eval' env (Var elemProof) = undefined 
+eval' :: Env ctx -> Expr ctx ty -> V ty
+eval' env (Var elemProof) = envLookup elemProof env 
 eval' env (Lam body) = Function f where
     f v = eval' env' body where
         env' = Shift v env
 eval' env (App m n) = app (eval' env m) (eval' env n) 
 
-app :: V ctx (Arrow arg result) -> V ctx arg -> V ctx result 
+app :: V (Arrow arg result) -> V arg -> V result 
 app (Function f) v = f v
--- Do we need this case? Non-function appliation possible in typed lambda calc
 app (Up m) n = Up (NeutralVApp m n) 
 
-reify :: V ctx t -> NormalExpr ctx t
+reify :: V t -> NormalExpr ctx t
 reify (Function f) = undefined 
 reify (Up m) = undefined 
 
-reifyNeutral :: NeutralV ctx t -> NeutralExpr ctx t
+reifyNeutral :: NeutralV t -> NeutralExpr ctx t
 reifyNeutral (NeutralVVar elemProof) = undefined 
 reifyNeutral (NeutralVApp m n) = NeutralApp (reifyNeutral m) (reify n)
 
 --- Debug
-eval :: Expr '[] t -> V '[] t
+eval :: Expr '[] t -> V t
 eval = undefined 
 
 isNormal :: NormalExpr '[] t -> Bool 
