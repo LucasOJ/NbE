@@ -46,7 +46,7 @@ data OPE :: [Ty] -> [Ty] -> * where
 
 data V :: [Ty] -> Ty -> * where 
     Up :: NeutralV ctx ty -> V ctx ty
-    Function :: (foreach ctx2 -> OPE ctx1 ctx2 -> (V ctx1 arg -> V ctx1 result)) -> V ctx2 (Arrow arg result)
+    Function :: (foreach ctx1 -> OPE ctx1 ctx2 -> (V ctx1 arg -> V ctx1 result)) -> V ctx2 (Arrow arg result)
 
 data NeutralV :: Ty -> * where 
     -- Need to be element of context?
