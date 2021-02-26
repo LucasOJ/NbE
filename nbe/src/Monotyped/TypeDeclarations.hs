@@ -45,13 +45,13 @@ data OPE :: [Ty] -> [Ty] -> * where
     Keep :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
 
 data V :: [Ty] -> Ty -> * where 
-    Up :: NeutralV ctx ty -> V ctx ty
+    Up :: NormalExpr ctx baseTy -> V ctx baseTy
     Function :: (foreach ctx1 -> OPE ctx1 ctx2 -> (V ctx1 arg -> V ctx1 result)) -> V ctx2 (Arrow arg result)
 
-data NeutralV :: Ty -> * where 
-    -- Need to be element of context?
-    NeutralVVar :: Elem ctx ty -> NeutralV ty
-    NeutralVApp :: NeutralV (Arrow arg result) -> V arg -> NeutralV result 
+-- data NeutralV :: Ty -> * where 
+--     -- Need to be element of context?
+--     NeutralVVar :: Elem ctx ty -> NeutralV ty
+--     NeutralVApp :: NeutralV (Arrow arg result) -> V arg -> NeutralV result 
 
 data Env :: [Ty] -> * where
     Empty :: Env '[]
