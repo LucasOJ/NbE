@@ -36,11 +36,17 @@ data NeutralExpr :: [Ty] -> Ty -> * where
     NeutralApp :: NeutralExpr ctx (Arrow arg result) -> NormalExpr ctx arg -> NeutralExpr ctx result
 
 -- Semantics
-data V :: Ty -> * where 
-    Up :: NeutralV ty -> V ty
 
-    -- TODO: CHECK THIS
-    Function :: (V arg -> V result) -> V (Arrow arg result)
+emplist = []
+ -- order preserving embeddings
+data OPE :: [Ty] -> [Ty] -> * where
+    Emp  :: OPE emplist emplist
+    Drop :: OPE ctx1 ctx2 -> OPE (x : ctx1) ctx2
+    Keep :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
+
+data V :: [Ty] -> Ty -> * where 
+    Up :: NeutralV ctx ty -> V ctx ty
+    Function :: OPE ctx1 ctx2 -> (V ctx1 arg -> V ctx1 result) -> V ctx2 (Arrow arg result)
 
 data NeutralV :: Ty -> * where 
     -- Need to be element of context?
