@@ -93,6 +93,31 @@ Restricitions on Haskell
 Not full dependent types - need singleton pattern
 
 \section{NbE for the Typed Lambda Calculus}
+Investigation: Are GADTs in Haskell powerful enough? Types are erased at runtime so true dependent typing not part of Haskell (programs at type level)
+
+Poissible to erase all type information, NbE on Untyped
+Issue: No proof that type preserved 
+Solution: Track types as do evaluation - nbe program itself proof that types preserved (subject reduction parallel?)
+
+Started by implementing same as untyped
+
+Main difference in semantics (V := a -> b | Neutral) 
+\cite{slides}
+
+\subsection{Transform to Weaker typed}
+Version where we ignore context keep types
+
+\subsection{Full typed}
+problem: Need to strengthen context evaluating body (eval Lam case)
+\subsection{Strength context solution 1 - Kripke Quantification}
+GADT - if holds for a context then also holds for longer one
+\subsection{Strengthen context solution 2 - Use closure instead of function}
+
+problem: locally nameless types in semantics
+\subsection{deBruijn Levels}
+FinOrd GADT - number of elements in context is length of context
+Are GADTs in Haskell flexible enough?
+
 \cite{modalTypes}
 
 \printbibliography

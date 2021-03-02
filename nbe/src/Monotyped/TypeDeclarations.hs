@@ -1,7 +1,12 @@
 
 {-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
-module Monotyped.TypeDeclarations () where 
+module Monotyped.TypeDeclarations (
+    Ty(..),
+    Elem(..),
+    Expr(..)
+) where 
 
+--import GHC.Types
 
 -- Representation of monotypes
 data Ty = BaseTy | Arrow Ty Ty
@@ -31,81 +36,52 @@ data NormalExpr :: [Ty] -> Ty -> * where
 
 data NeutralExpr :: [Ty] -> Ty -> * where
     NeutralVar :: Elem ctx ty -> NeutralExpr ctx ty
-
-    -- TODO: CHECK THIS
     NeutralApp :: NeutralExpr ctx (Arrow arg result) -> NormalExpr ctx arg -> NeutralExpr ctx result
 
 -- Semantics
-data V :: Ty -> * where 
-    Up :: NeutralV ty -> V ty
+data V :: [Ty] -> Ty -> * where 
+    Up :: NeutralV ctx ty -> V ctx ty
+    -- Closure :: Expr ctx ty -> V ctx ty
+    -- ?? Do we need an env here
 
     -- TODO: CHECK THIS
-    Function :: (V arg -> V result) -> V (Arrow arg result)
+    Function :: (V ctx arg -> V ctx result) -> V ctx (Arrow arg result)
 
-data NeutralV :: Ty -> * where 
+data NeutralV :: [Ty] -> Ty -> * where 
     -- Need to be element of context?
-    NeutralVVar :: Elem ctx ty -> NeutralV ty
-    NeutralVApp :: NeutralV (Arrow arg result) -> V arg -> NeutralV result 
+    NeutralVVar :: Elem ctx ty -> NeutralV ctx ty
+    NeutralVApp :: NeutralV ctx (Arrow arg result) -> V ctx arg -> NeutralV ctx result 
+
 
 data Env :: [Ty] -> * where
     Empty :: Env '[]
-    Shift :: V ty -> Env types -> Env (ty : types)
+    Shift :: V (ty : ctx) ty -> Env ctx -> Env (ty : ctx)
+
+    -- Should we only add V into Env of same context?
+    -- Yes -> only add v into same current context
 
 -- Since ty is an element of types, we will never call on the empty environment
-envLookup :: Elem types ty -> Env types -> V ty
+-- Need proof in env rather than proof in context
+
+envLookup :: Elem types ty -> Env types -> V types ty 
 envLookup Head     (Shift v _)   = v
-envLookup (Tail n) (Shift _ env) = envLookup n env
+envLookup (Tail n) (Shift _ env) = weaken (envLookup n env)
 
--- ty should remain the same always
-eval' :: Env ctx -> Expr ctx ty -> V ty
-eval' env (Var elemProof) = envLookup elemProof env 
-eval' env (Lam body) = Function f where
-    f v = eval' env' body where
-        env' = Shift v env
-eval' env (App m n) = app (eval' env m) (eval' env n) 
+weaken :: V ctx t -> V (a ': ctx) t
+weaken = undefined 
 
-app :: V (Arrow arg result) -> V arg -> V result 
-app (Function f) v = f v
-app (Up m) n = Up (NeutralVApp m n) 
 
-reify :: V t -> NormalExpr ctx t
-reify (Function f) = undefined 
-reify (Up m) = undefined 
+{-
+data Env :: [Ty] -> * where 
+    Empty :: Env '[]
+    Shift :: V ctx ty -> Env ctx -> Env (ty : ctx)
 
-reifyNeutral :: NeutralV t -> NeutralExpr ctx t
-reifyNeutral (NeutralVVar elemProof) = undefined 
-reifyNeutral (NeutralVApp m n) = NeutralApp (reifyNeutral m) (reify n)
+envLookup :: Elem types ty -> Env types -> V types' ty
+envLookup Head     (Shift v _ )  = v
+envLookup (Tail n) (Shift _ env) = envLookup n env  
 
---- Debug
-eval :: Expr '[] t -> V t
-eval = undefined 
 
-isNormal :: NormalExpr '[] t -> Bool 
-isNormal _ = True
-
-exprToString :: Expr '[] t -> String
-exprToString = exprToString'
-
-exprToString' :: Expr ctx t -> String
-exprToString' (Var _) = "Var"
-exprToString' (Lam body) = "Lam ( " ++ exprToString' body ++ " )"
-exprToString' (App m n) = "App " ++ exprToString' m ++ " " ++ exprToString' n
-
--- TODO: How to represent environment and tie in with type environent in type?
-
-elemToIndex :: Elem xs s -> Int
-elemToIndex Head = 0
-elemToIndex (Tail n) = 1 + elemToIndex n
-
---- Combinators
-
-identity :: Expr ctx (Arrow a a)
-identity = Lam (Var Head)
-
-k1 :: Expr ctx (Arrow a (Arrow b a))
-k1 = Lam (Lam (Var (Tail Head)))
-
-k2 :: Expr ctx (Arrow a (Arrow b b))
-k2 = Lam (Lam (Var Head))
-
---exprToString' :: Expr a t -> String
+data FinOrd :: GHC.Types.Nat -> * where
+    Zero :: FinOrd n
+    Succ :: FinOrd n -> FinOrd (n'+1)
+-}

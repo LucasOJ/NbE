@@ -1,5 +1,5 @@
 
-module Untyped.DeBruijnNbE () where 
+module Untyped.DeBruijnNbE (normaliseDbExpr) where 
 import Prelude hiding ( lookup, empty )
 import Data.Map (  insert, Map, mapKeys, lookup)
 import qualified Data.Map as Map ( fromList )
