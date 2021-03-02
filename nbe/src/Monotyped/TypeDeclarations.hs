@@ -39,19 +39,22 @@ data NeutralExpr :: [Ty] -> Ty -> * where
     NeutralApp :: NeutralExpr ctx (Arrow arg result) -> NormalExpr ctx arg -> NeutralExpr ctx result
 
 -- Semantics
+
+emplist = []
+ -- order preserving embeddings
+data OPE :: [Ty] -> [Ty] -> * where
+    Emp  :: OPE emplist emplist
+    Drop :: OPE ctx1 ctx2 -> OPE (x : ctx1) ctx2
+    Keep :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
+
 data V :: [Ty] -> Ty -> * where 
-    Up :: NeutralV ctx ty -> V ctx ty
-    -- Closure :: Expr ctx ty -> V ctx ty
-    -- ?? Do we need an env here
+    Up :: NormalExpr ctx baseTy -> V ctx baseTy
+    Function :: (foreach ctx1 -> OPE ctx1 ctx2 -> (V ctx1 arg -> V ctx1 result)) -> V ctx2 (Arrow arg result)
 
-    -- TODO: CHECK THIS
-    Function :: (V ctx arg -> V ctx result) -> V ctx (Arrow arg result)
-
-data NeutralV :: [Ty] -> Ty -> * where 
-    -- Need to be element of context?
-    NeutralVVar :: Elem ctx ty -> NeutralV ctx ty
-    NeutralVApp :: NeutralV ctx (Arrow arg result) -> V ctx arg -> NeutralV ctx result 
-
+-- data NeutralV :: Ty -> * where 
+--     -- Need to be element of context?
+--     NeutralVVar :: Elem ctx ty -> NeutralV ty
+--     NeutralVApp :: NeutralV (Arrow arg result) -> V arg -> NeutralV result 
 
 data Env :: [Ty] -> * where
     Empty :: Env '[]
