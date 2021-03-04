@@ -40,22 +40,84 @@ data NeutralExpr :: [Ty] -> Ty -> * where
 
 -- Semantics
 
+emplist :: [a]
 emplist = []
+
  -- order preserving embeddings
 data OPE :: [Ty] -> [Ty] -> * where
-    Emp  :: OPE emplist emplist
-    Drop :: OPE ctx1 ctx2 -> OPE (x : ctx1) ctx2
-    Keep :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
+    Empty :: OPE emplist emplist
+    Drop  :: OPE ctx1 ctx2 -> OPE (x : ctx1) ctx2
+    Keep  :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
+
+-- Q: type family for id_e? How to represent function on types?
+
+weakenElem :: OPE weak strong -> Elem strong ty -> Elem weak ty
+weakenElem Empty v = v
+weakenElem (Drop ope) v = Tail (weakenElem ope v)
+weakenElem (Keep ope) Head = Head
+weakenElem (Keep ope) (Tail v) = Tail (weakenElem ope v)
+
+-- weakenExpr :: OPE weak strong -> Expr strong ty -> Expr weak ty
+-- weakenExpr ope (Var n) = Var (weakenElem ope n)
+-- weakenExpr ope (Lam body) = Lam (weakenExpr (Keep ope) body)
+-- weakenExpr ope (App f a) = App (weakenExpr ope f) (weakenExpr ope a)
+
+weakenNormal :: OPE weak strong -> NormalExpr strong ty -> NormalExpr weak ty
+weakenNormal ope (NormalNeutral n) = NormalNeutral (weakenNeutral ope n)
+weakenNormal ope (NormalLam n) = NormalLam (weakenNormal (Keep ope) n)
+
+weakenNeutral :: OPE weak strong -> NeutralExpr strong ty -> NeutralExpr weak ty
+weakenNeutral ope (NeutralVar n) = NeutralVar (weakenElem ope n)
+weakenNeutral ope (NeutralApp f a) = NeutralApp (weakenNeutral ope f) (weakenNormal ope a) 
+
+composeOPEs :: OPE b c -> OPE a b -> OPE a c
+composeOPEs v Empty = v
+composeOPEs v (Drop u) = Drop (composeOPEs v u)
+composeOPEs (Drop v) (Keep u) = Drop (composeOPEs v u)
+composeOPEs (Keep v) (Keep u) = Keep (composeOPEs v u)
 
 data V :: [Ty] -> Ty -> * where 
-    Up :: NormalExpr ctx baseTy -> V ctx baseTy
-    Function :: (foreach ctx1 -> OPE ctx1 ctx2 -> (V ctx1 arg -> V ctx1 result)) -> V ctx2 (Arrow arg result)
+    Up :: NormalExpr ctx BaseTy -> V ctx BaseTy
+    --Function ::  OPE weak strong -> (V weak arg -> V weak result) -> V strong (Arrow arg result)
+    -- Q: Feels like this is going the wrong way (possible to strengthen context? Subsitution?)
+    Function :: OPE weak strong -> (V weak arg -> V weak result) -> V weak (Arrow arg result)
+    -- Q: In https://github.com/dpndnt/library/blob/master/doc/pdf/kovacs-2017.pdf this is a function not a datatype
+    -- Q: How to pattern match on it?
+
+weakenV :: OPE weak strong -> V strong ty -> V weak ty
+weakenV ope (Up nf) = Up (weakenNormal ope nf)
+weakenV ope (Function ope' f) = Function ope'' f where
+    ope'' = composeOPEs ope' ope
+
+data Env :: [Ty] -> [Ty] -> * where
+    EmptyEnv :: Env '[] ctx
+    ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
+    -- Q: What's the point of ctxV? Context to return into?
+
+envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty 
+envLookup Head     (ConsEnv _ v)    = v
+envLookup (Tail n) (ConsEnv prev _) = envLookup n prev
+
+weakenEnv :: OPE b c -> Env a b -> Env a c
+weakenEnv _ EmptyEnv = EmptyEnv
+weakenEnv ope (ConsEnv tail v) = ConsEnv (weakenEnv ope tail) (weakenV ope v)
+
+eval :: Expr ctx ty -> Env ctx ctxV -> V ctxV ty
+eval (Var n)    env = envLookup n env
+eval (Lam body) env = Function ope f where 
+    f v = eval body (ConsEnv env v)
+-- Q: Why does the lambda in the paper have 2 args? 
+eval (App f a)  env = appV (eval f env) (eval a env) 
+
+appV :: V ctx (Arrow arg ty) -> V ctx arg -> V ctx ty
+appV (Function ope f) a = f a 
+
 
 -- data NeutralV :: Ty -> * where 
 --     -- Need to be element of context?
 --     NeutralVVar :: Elem ctx ty -> NeutralV ty
 --     NeutralVApp :: NeutralV (Arrow arg result) -> V arg -> NeutralV result 
-
+{-
 data Env :: [Ty] -> * where
     Empty :: Env '[]
     Shift :: V (ty : ctx) ty -> Env ctx -> Env (ty : ctx)
@@ -72,7 +134,7 @@ envLookup (Tail n) (Shift _ env) = weaken (envLookup n env)
 
 weaken :: V ctx t -> V (a ': ctx) t
 weaken = undefined 
-
+-}
 
 {-
 data Env :: [Ty] -> * where 
