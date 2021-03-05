@@ -71,26 +71,30 @@ weakenNeutral ope (NeutralVar n) = NeutralVar (weakenElem ope n)
 weakenNeutral ope (NeutralApp f a) = NeutralApp (weakenNeutral ope f) (weakenNormal ope a) 
 
 composeOPEs :: OPE b c -> OPE a b -> OPE a c
-composeOPEs v Empty = v
-composeOPEs v (Drop u) = Drop (composeOPEs v u)
+composeOPEs v        Empty    = v
+composeOPEs v        (Drop u) = Drop (composeOPEs v u)
 composeOPEs (Drop v) (Keep u) = Drop (composeOPEs v u)
 composeOPEs (Keep v) (Keep u) = Keep (composeOPEs v u)
 
 data V :: [Ty] -> Ty -> * where 
     Up :: NormalExpr ctx BaseTy -> V ctx BaseTy
+    
     --Function ::  OPE weak strong -> (V weak arg -> V weak result) -> V strong (Arrow arg result)
     -- Q: Feels like this is going the wrong way (possible to strengthen context? Subsitution?)
-    Function :: OPE weak strong -> (V weak arg -> V weak result) -> V weak (Arrow arg result)
+    
+    --Function :: OPE weak strong -> (V weak arg -> V weak result) -> V weak (Arrow arg result)
     -- Q: In https://github.com/dpndnt/library/blob/master/doc/pdf/kovacs-2017.pdf this is a function not a datatype
     -- Q: How to pattern match on it?
 
+    Function :: (OPE weak strong -> V weak arg -> V weak result) -> V strong (Arrow arg result)
+    
 weakenV :: OPE weak strong -> V strong ty -> V weak ty
 weakenV ope (Up nf) = Up (weakenNormal ope nf)
-weakenV ope (Function ope' f) = Function ope'' f where
-    ope'' = composeOPEs ope' ope
+weakenV ope (Function f) = Function f' where
+    f' ope' = f (composeOPEs ope ope')
 
 data Env :: [Ty] -> [Ty] -> * where
-    EmptyEnv :: Env '[] ctx
+    EmptyEnv :: Env '[] ctxV
     ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
     -- Q: What's the point of ctxV? Context to return into?
 
@@ -98,20 +102,25 @@ envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty
 envLookup Head     (ConsEnv _ v)    = v
 envLookup (Tail n) (ConsEnv prev _) = envLookup n prev
 
-weakenEnv :: OPE b c -> Env a b -> Env a c
+weakenEnv :: OPE c b -> Env a b -> Env a c
 weakenEnv _ EmptyEnv = EmptyEnv
 weakenEnv ope (ConsEnv tail v) = ConsEnv (weakenEnv ope tail) (weakenV ope v)
 
 eval :: Expr ctx ty -> Env ctx ctxV -> V ctxV ty
 eval (Var n)    env = envLookup n env
-eval (Lam body) env = Function ope f where 
-    f v = eval body (ConsEnv env v)
+eval (Lam body) env = Function f where 
+    f ope v = eval body (ConsEnv env v)
+    -- Need to weaken context here!
+
 -- Q: Why does the lambda in the paper have 2 args? 
-eval (App f a)  env = appV (eval f env) (eval a env) 
+eval (App f a)  env = appV env (eval f env) (eval a env) 
 
-appV :: V ctx (Arrow arg ty) -> V ctx arg -> V ctx ty
-appV (Function ope f) a = f a 
+appV :: Env ctx ctxV -> V ctx (Arrow arg ty) -> V ctx arg -> V ctx ty
+appV env (Function f)  = f (opeFromEnv env) 
 
+opeFromEnv :: Env ctx ctxV -> OPE ctx ctx
+opeFromEnv EmptyEnv = Empty
+opeFromEnv (ConsEnv env v) = Keep (opeFromEnv env)
 
 -- data NeutralV :: Ty -> * where 
 --     -- Need to be element of context?
