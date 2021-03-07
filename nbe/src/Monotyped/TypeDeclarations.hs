@@ -1,5 +1,6 @@
 
-{-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
+{-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs, RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 module Monotyped.TypeDeclarations (
     Ty(..),
     Elem(..),
@@ -40,21 +41,18 @@ data NeutralExpr :: [Ty] -> Ty -> * where
 
 -- Semantics
 
-emplist :: [a]
-emplist = []
-
  -- order preserving embeddings
 data OPE :: [Ty] -> [Ty] -> * where
-    Empty :: OPE emplist emplist
+    Empty :: OPE '[] '[]
     Drop  :: OPE ctx1 ctx2 -> OPE (x : ctx1) ctx2
     Keep  :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
 
 -- Q: type family for id_e? How to represent function on types?
 
 weakenElem :: OPE weak strong -> Elem strong ty -> Elem weak ty
-weakenElem Empty v = v
-weakenElem (Drop ope) v = Tail (weakenElem ope v)
-weakenElem (Keep ope) Head = Head
+weakenElem Empty      v        = v
+weakenElem (Drop ope) v        = Tail (weakenElem ope v)
+weakenElem (Keep ope) Head     = Head
 weakenElem (Keep ope) (Tail v) = Tail (weakenElem ope v)
 
 -- weakenExpr :: OPE weak strong -> Expr strong ty -> Expr weak ty
@@ -97,6 +95,7 @@ data Env :: [Ty] -> [Ty] -> * where
     EmptyEnv :: Env '[] ctxV
     ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
     -- Q: What's the point of ctxV? Context to return into?
+    -- Q: Why only contains Vs with same semantic context?
 
 envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty 
 envLookup Head     (ConsEnv _ v)    = v
@@ -109,18 +108,40 @@ weakenEnv ope (ConsEnv tail v) = ConsEnv (weakenEnv ope tail) (weakenV ope v)
 eval :: Expr ctx ty -> Env ctx ctxV -> V ctxV ty
 eval (Var n)    env = envLookup n env
 eval (Lam body) env = Function f where 
-    f ope v = eval body (ConsEnv env v)
-    -- Need to weaken context here!
+    f ope v = eval body (ConsEnv (weakenEnv ope env) v)
+    -- Q: 
+eval (App f a)  env = appV (eval f env) (eval a env) where
+    appV :: V ctxV (Arrow arg ty) -> V ctxV arg -> V ctxV ty
+    appV (Function f) a' = undefined 
+    -- TODO: fix this!
 
--- Q: Why does the lambda in the paper have 2 args? 
-eval (App f a)  env = appV env (eval f env) (eval a env) 
+-- appV :: Env ctx ctxV -> V ctxV (Arrow arg ty) -> V ctxV arg -> V ctxV ty
+-- appV env (Function f) = f idOPE 
 
-appV :: Env ctx ctxV -> V ctx (Arrow arg ty) -> V ctx arg -> V ctx ty
-appV env (Function f)  = f (opeFromEnv env) 
+idOPE :: forall (tys :: [Ty]). OPE tys tys
+idOPE = undefined 
+
+type family IdOPE (ctxV :: [Ty]) :: OPE ctxV ctxV where
+    IdOPE '[]      = Empty
+    IdOPE (x : xs) = Keep (IdOPE xs)
+
+data STy :: Ty -> * where
+    SBaseTye :: STy BaseTy
+    SArrow   :: STy (Arrow a b)
 
 opeFromEnv :: Env ctx ctxV -> OPE ctx ctx
 opeFromEnv EmptyEnv = Empty
 opeFromEnv (ConsEnv env v) = Keep (opeFromEnv env)
+
+reify :: V ctx ty -> NormalExpr ctx ty
+reify (Up nf)      = nf
+--reify (Function f) = NormalLam (reify ())
+
+
+normalise :: Expr '[] ty -> NormalExpr '[] ty
+normalise t = reify (eval t EmptyEnv)
+-- TODO: Expand to non-empty contexts?
+
 
 -- data NeutralV :: Ty -> * where 
 --     -- Need to be element of context?
