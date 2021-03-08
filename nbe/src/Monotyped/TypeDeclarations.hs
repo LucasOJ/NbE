@@ -97,14 +97,19 @@ weakenEnv :: OPE c b -> Env a b -> Env a c
 weakenEnv _ EmptyEnv = EmptyEnv
 weakenEnv ope (ConsEnv tail v) = ConsEnv (weakenEnv ope tail) (weakenV ope v)
 
-eval :: Expr ctx ty -> Env ctx ctxV -> V ctxV ty
+eval :: (SingContext ctxV) => Expr ctx ty -> Env ctx ctxV -> V ctxV ty
 eval (Var n)    env = envLookup n env
 eval (Lam body) env = Function f where 
     f ope v = eval body (ConsEnv (weakenEnv ope env) v)
-    -- Q: 
-eval (App f a)  env = appV (eval f env) (eval a env) where
+    -- Q: Any type? 
+
+eval (App f a) env = appV (eval f env) (eval a env) where
     appV :: V ctxV (Arrow arg ty) -> V ctxV arg -> V ctxV ty
-    appV (Function f) a' = undefined 
+    appV (Function f') a' = f' (idOPEFromEnv env) a'
+
+idOPEFromEnv :: (SingContext ctxV) => Env ctx ctxV -> OPE ctxV ctxV
+idOPEFromEnv _ = idOpe 
+
     -- TODO: fix this!
 
 -- appV :: Env ctx ctxV -> V ctxV (Arrow arg ty) -> V ctxV arg -> V ctxV ty
@@ -116,6 +121,11 @@ idOPE = undefined
 type family IdOPE (ctxV :: [Ty]) :: OPE ctxV ctxV where
     IdOPE '[]      = Empty
     IdOPE (x : xs) = Keep (IdOPE xs)
+
+opeFromEnv :: Env ctx ctxV -> OPE ctx ctx
+opeFromEnv EmptyEnv = Empty
+opeFromEnv (ConsEnv env v) = Keep (opeFromEnv env)
+
 -}
 data STy :: Ty -> * where
     SBaseTy :: STy BaseTy
@@ -130,26 +140,29 @@ instance SingTy 'BaseTy where
 instance (SingTy a, SingTy b) => SingTy ('Arrow a b) where
     singTy = SArrow singTy singTy
 
-data SList :: [Ty] -> * where
-    SEmpty :: SList '[]
-    SCons  :: STy a -> SList xs -> SList xs
+data SContext :: [Ty] -> * where
+    SEmpty :: SContext '[]
+    SCons  :: (SingContext xs) => STy a -> SContext xs -> SContext xs
 
-class SingCon xs where
+class SingContext xs where
     idOpe :: OPE xs xs
+    wk :: OPE (x:xs) xs
 
-instance SingCon '[] where
+instance SingContext '[] where
     idOpe = Empty
+    wk = Drop idOpe
 
-instance (SingCon xs) => SingCon (x:xs) where
+instance (SingContext xs) => SingContext (x:xs) where
     idOpe = Keep idOpe
+    wk = Drop idOpe
 
-opeFromEnv :: Env ctx ctxV -> OPE ctx ctx
-opeFromEnv EmptyEnv = Empty
-opeFromEnv (ConsEnv env v) = Keep (opeFromEnv env)
+weakenContext :: (SingContext ctx) => V ctx ty -> OPE (x:ctx) ctx
+weakenContext _ = wk 
 
 reify :: V ctx ty -> NormalExpr ctx ty
 reify (Up nf)      = nf
---reify (Function f) = NormalLam (reify ())
+reify (Function f) = NormalLam (reify (f a (evalNeutral' ope (NeutralVar Head)))) where
+    ope = weakenContext (Function f)
 
 evalNeutral :: (SingTy ty) => NeutralExpr ctx ty -> V ctx ty
 evalNeutral = evalNeutral' singTy
@@ -158,7 +171,7 @@ evalNeutral' :: STy ty -> NeutralExpr ctx ty -> V ctx ty
 evalNeutral' SBaseTy       n = Up (NormalNeutral n)  
 evalNeutral' (SArrow a b)  n = Function f where
     -- TODO: Type properly (relies on Any)
-    --f :: OPE ctx1 ctx2 -> V ctx2 arg -> V ctx1 result
+    -- f :: (SingTy result) => OPE ctx1 ctx2 -> V ctx1 arg -> V ctx1 result
     f ope v = evalNeutral (NeutralApp (weakenNeutral ope n) (reify v))
 
 normalise :: Expr '[] ty -> NormalExpr '[] ty
