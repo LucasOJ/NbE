@@ -77,13 +77,19 @@ Explicit type constructor arguments
 Language extensions:
 DataKinds, TypeOperators, PolyKinds, GADTs.
 
-Example 1: Vec 
+Example 1: Vec - indexed type advantage since total function
+
+Fails for replicate without work \cite{DependentHaskell}
+
+Advantage over ADTs: type refinement by constructor
 
 Justification of base type \textit{extension work??: string/integer type}
-Example 2: IsElem
-Example 3: Expr
+Example 2: IsElem - value as proof
+Example 3: Expr - all values well typed by construction
 
-Big-step evalulator
+Difference between [] and '[] (kinds vs types) in terms of levels
+
+Big-step evalulator?
 
 Input/Ouput type as pre-condition/post-condition (eg empty context)
 
@@ -104,18 +110,49 @@ Started by implementing same as untyped
 Main difference in semantics (V := a -> b | Neutral) 
 \cite{slides}
 
-\subsection{Transform to Weaker typed}
-Version where we ignore context keep types
-
-\subsection{Full typed}
 problem: Need to strengthen context evaluating body (eval Lam case)
-\subsection{Strength context solution 1 - Kripke Quantification}
-GADT - if holds for a context then also holds for longer one
-\subsection{Strengthen context solution 2 - Use closure instead of function}
+\subsection{Solution: Order Preserving Embeddings (OPEs)}
+
+Following implementation in Agda \cite{AgdaNbe}, agda has full dependent types (type system more powerful) - adapt for haskell, how nicely? 
+
+if a term well typed for one context, also well typed for any longer one
+
+A value of type 'OPE strong weak' can derive weak from strong by dropping elements from context
+
+OPE is a relation on typing contexts
+
+\subsection{Semantic set}
+
+Defintion of V using OPEs - Haskell vs agda
+
+Helper functions (composition, strengthing relative to OPE) - explain derivations
+
+\subsection{implementing Eval}
+
+Defintion of environment (maps expressions in syntax context ctx to values in semantics with context ctxV)
+
+problem: in app case how to we get identity OPE for semantic context?
+
+But types erased at compile time to make Haskell efficient
+
+How to generate a value at runtime dependent on type erased at compile time
+
+dependent pattern match \cite{SingletonsGuide}
+
+\subsection{Solution: Singleton pattern}
+
+Method of Type to value known as reflection \cite{SingletonsGuide}
+
+Idea: Create value-level tags for types - singleton types correspond type we're interested in, inhabited by only one value for each case
+
+Examples: Reify case analysis, Ty reflection, Context reflection
+
+Explicitly passing as value to pattern match on
+
+Generate implictly using typeclass
 
 problem: locally nameless types in semantics
 \subsection{deBruijn Levels}
-FinOrd GADT - number of elements in context is length of context
 Are GADTs in Haskell flexible enough?
 
 \cite{modalTypes}

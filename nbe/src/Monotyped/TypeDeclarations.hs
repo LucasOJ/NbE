@@ -99,7 +99,6 @@ eval (Lam body) env = Function f where
     -- Q: Any type? 
     -- TODO: Fix this
 
-
 eval (App f a) env = appV (eval f env) (eval a env) where
     appV :: V ctxV (Arrow arg ty) -> V ctxV arg -> V ctxV ty
     appV (Function f') a' = f' (idOPEFromEnv env) a'
@@ -123,7 +122,7 @@ instance (SingTy a, SingTy b) => SingTy ('Arrow a b) where
 
 data SContext :: [Ty] -> * where
     SEmpty :: SContext '[]
-    SCons  :: (SingContext xs) => STy a -> SContext xs -> SContext xs
+    SCons  :: (SingContext xs) => STy x -> SContext xs -> SContext (x:xs)
 
 class SingContext xs where
     idOpe :: OPE xs xs
@@ -142,7 +141,7 @@ weakenContext _ = wk
 
 reify :: V ctx ty -> NormalExpr ctx ty
 reify (Up nf)      = nf
-reify (Function f) = NormalLam (reify (f a (evalNeutral' ope (NeutralVar Head)))) where
+reify (Function f) = NormalLam (reify (f ope (evalNeutral' (NeutralVar Head)))) where
        -- TODO: Fix this
 
     ope = weakenContext (Function f)
