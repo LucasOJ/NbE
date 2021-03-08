@@ -76,14 +76,6 @@ composeOPEs (Keep v) (Keep u) = Keep (composeOPEs v u)
 
 data V :: [Ty] -> Ty -> * where 
     Up :: NormalExpr ctx BaseTy -> V ctx BaseTy
-    
-    --Function ::  OPE weak strong -> (V weak arg -> V weak result) -> V strong (Arrow arg result)
-    -- Q: Feels like this is going the wrong way (possible to strengthen context? Subsitution?)
-    
-    --Function :: OPE weak strong -> (V weak arg -> V weak result) -> V weak (Arrow arg result)
-    -- Q: In https://github.com/dpndnt/library/blob/master/doc/pdf/kovacs-2017.pdf this is a function not a datatype
-    -- Q: How to pattern match on it?
-
     Function :: (OPE weak strong -> V weak arg -> V weak result) -> V strong (Arrow arg result)
     
 weakenV :: OPE weak strong -> V strong ty -> V weak ty
@@ -117,17 +109,39 @@ eval (App f a)  env = appV (eval f env) (eval a env) where
 
 -- appV :: Env ctx ctxV -> V ctxV (Arrow arg ty) -> V ctxV arg -> V ctxV ty
 -- appV env (Function f) = f idOPE 
-
+{-
 idOPE :: forall (tys :: [Ty]). OPE tys tys
 idOPE = undefined 
 
 type family IdOPE (ctxV :: [Ty]) :: OPE ctxV ctxV where
     IdOPE '[]      = Empty
     IdOPE (x : xs) = Keep (IdOPE xs)
-
+-}
 data STy :: Ty -> * where
-    SBaseTye :: STy BaseTy
-    SArrow   :: STy (Arrow a b)
+    SBaseTy :: STy BaseTy
+    SArrow  :: (SingTy a, SingTy b) => STy a -> STy b -> STy (Arrow a b)
+
+class SingTy a where
+    singTy :: STy a 
+
+instance SingTy 'BaseTy where
+    singTy = SBaseTy
+
+instance (SingTy a, SingTy b) => SingTy ('Arrow a b) where
+    singTy = SArrow singTy singTy
+
+data SList :: [Ty] -> * where
+    SEmpty :: SList '[]
+    SCons  :: STy a -> SList xs -> SList xs
+
+class SingCon xs where
+    idOpe :: OPE xs xs
+
+instance SingCon '[] where
+    idOpe = Empty
+
+instance (SingCon xs) => SingCon (x:xs) where
+    idOpe = Keep idOpe
 
 opeFromEnv :: Env ctx ctxV -> OPE ctx ctx
 opeFromEnv EmptyEnv = Empty
@@ -137,46 +151,15 @@ reify :: V ctx ty -> NormalExpr ctx ty
 reify (Up nf)      = nf
 --reify (Function f) = NormalLam (reify ())
 
+evalNeutral :: (SingTy ty) => NeutralExpr ctx ty -> V ctx ty
+evalNeutral = evalNeutral' singTy
+
+evalNeutral' :: STy ty -> NeutralExpr ctx ty -> V ctx ty
+evalNeutral' SBaseTy       n = Up (NormalNeutral n)  
+evalNeutral' (SArrow a b)  n = Function f where
+    -- TODO: Type properly (relies on Any)
+    --f :: OPE ctx1 ctx2 -> V ctx2 arg -> V ctx1 result
+    f ope v = evalNeutral (NeutralApp (weakenNeutral ope n) (reify v))
 
 normalise :: Expr '[] ty -> NormalExpr '[] ty
 normalise t = reify (eval t EmptyEnv)
--- TODO: Expand to non-empty contexts?
-
-
--- data NeutralV :: Ty -> * where 
---     -- Need to be element of context?
---     NeutralVVar :: Elem ctx ty -> NeutralV ty
---     NeutralVApp :: NeutralV (Arrow arg result) -> V arg -> NeutralV result 
-{-
-data Env :: [Ty] -> * where
-    Empty :: Env '[]
-    Shift :: V (ty : ctx) ty -> Env ctx -> Env (ty : ctx)
-
-    -- Should we only add V into Env of same context?
-    -- Yes -> only add v into same current context
-
--- Since ty is an element of types, we will never call on the empty environment
--- Need proof in env rather than proof in context
-
-envLookup :: Elem types ty -> Env types -> V types ty 
-envLookup Head     (Shift v _)   = v
-envLookup (Tail n) (Shift _ env) = weaken (envLookup n env)
-
-weaken :: V ctx t -> V (a ': ctx) t
-weaken = undefined 
--}
-
-{-
-data Env :: [Ty] -> * where 
-    Empty :: Env '[]
-    Shift :: V ctx ty -> Env ctx -> Env (ty : ctx)
-
-envLookup :: Elem types ty -> Env types -> V types' ty
-envLookup Head     (Shift v _ )  = v
-envLookup (Tail n) (Shift _ env) = envLookup n env  
-
-
-data FinOrd :: GHC.Types.Nat -> * where
-    Zero :: FinOrd n
-    Succ :: FinOrd n -> FinOrd (n'+1)
--}
