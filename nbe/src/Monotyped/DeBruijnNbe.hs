@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
-module Monotyped.DeBruijnNbE () where
+module Monotyped.DeBruijnNbe () where
 
 import Monotyped.TypeDeclarations
 

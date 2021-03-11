@@ -1,6 +1,5 @@
 
-{-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs, RankNTypes #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
 module Monotyped.TypeDeclarations (
     Ty(..),
     Elem(..),
@@ -88,21 +87,23 @@ envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty
 envLookup Head     (ConsEnv _ v)    = v
 envLookup (Tail n) (ConsEnv prev _) = envLookup n prev
 
-weakenEnv :: OPE c b -> Env a b -> Env a c
-weakenEnv _ EmptyEnv = EmptyEnv
-weakenEnv ope (ConsEnv tail v) = ConsEnv (weakenEnv ope tail) (strengthenV ope v)
+strengthenEnv :: OPE c b -> Env a b -> Env a c
+strengthenEnv _ EmptyEnv = EmptyEnv
+strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthenV ope v)
 
-eval :: (SingContext ctxV) => Expr ctx ty -> Env ctx ctxV -> V ctxV ty
+eval :: Expr ctx ty -> Env ctx ctxV -> V ctxV ty
 eval (Var n)    env = envLookup n env
-eval (Lam body) env = Function f where 
-    f ope v = eval body (ConsEnv (weakenEnv ope env) v)
+eval (Lam body) env = Function f where
+    f ope v = eval body (ConsEnv (strengthenEnv ope env) v)
     -- Q: Any type? 
     -- TODO: Fix this
 
 eval (App f a) env = appV (eval f env) (eval a env) where
     appV :: V ctxV (Arrow arg ty) -> V ctxV arg -> V ctxV ty
     appV (Function f') a' = f' (idOPEFromEnv env) a'
+
     -- TODO: Fix this
+    -- Q: How to set strong ~ ctxV (strong from Function def, ctxV from App def)
 
 idOPEFromEnv :: (SingContext ctxV) => Env ctx ctxV -> OPE ctxV ctxV
 idOPEFromEnv _ = idOpe 
@@ -123,6 +124,7 @@ instance (SingTy a, SingTy b) => SingTy ('Arrow a b) where
 data SContext :: [Ty] -> * where
     SEmpty :: SContext '[]
     SCons  :: (SingContext xs) => STy x -> SContext xs -> SContext (x:xs)
+    -- Q: STy correct?
 
 class SingContext xs where
     idOpe :: OPE xs xs
@@ -143,7 +145,6 @@ reify :: V ctx ty -> NormalExpr ctx ty
 reify (Up nf)      = nf
 reify (Function f) = NormalLam (reify (f ope (evalNeutral' (NeutralVar Head)))) where
        -- TODO: Fix this
-
     ope = weakenContext (Function f)
 
 evalNeutral :: (SingTy ty) => NeutralExpr ctx ty -> V ctx ty
@@ -153,7 +154,7 @@ evalNeutral' :: STy ty -> NeutralExpr ctx ty -> V ctx ty
 evalNeutral' SBaseTy       n = Up (NormalNeutral n)  
 evalNeutral' (SArrow a b)  n = Function f where
     -- TODO: Type properly (relies on Any)
-    -- f :: (SingTy result) => OPE ctx1 ctx2 -> V ctx1 arg -> V ctx1 result
+    f :: (SingTy result) => OPE ctx1 ctx2 -> V ctx1 arg -> V ctx1 result
     f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
 
 normalise :: Expr '[] ty -> NormalExpr '[] ty
