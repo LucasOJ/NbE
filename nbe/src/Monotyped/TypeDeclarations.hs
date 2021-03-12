@@ -1,6 +1,6 @@
 
 {-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, Rank2Types, TypeApplications #-}
 module Monotyped.TypeDeclarations (
     Ty(..),
     Elem(..),
@@ -71,12 +71,14 @@ composeOPEs (Keep v) (Keep u) = Keep (composeOPEs v u)
 
 data V :: [Ty] -> Ty -> * where 
     Up :: NormalExpr ctx BaseTy -> V ctx BaseTy
-    Function :: (OPE strong weak -> V strong arg -> V strong result) -> V weak (Arrow arg result)
+    Function :: (forall strong . OPE strong weak -> V strong arg -> V strong result) -> V weak (Arrow arg result)
     
 strengthenV :: OPE strong weak -> V weak ty -> V strong ty
 strengthenV ope (Up nf) = Up (strengthenNormal ope nf)
-strengthenV ope (Function f) = Function f' where
-    f' ope' = f (composeOPEs ope ope')
+strengthenV (ope :: OPE strong weak) (Function (f :: forall strong . OPE strong weak -> V strong arg -> V strong result)) = Function f' 
+    where
+        f' :: OPE stronger strong -> V stronger arg -> V stronger result
+        f' ope' = f (composeOPEs ope ope')
 
 data Env :: [Ty] -> [Ty] -> * where
     EmptyEnv :: Env '[] ctxV
@@ -93,16 +95,20 @@ strengthenEnv _ EmptyEnv = EmptyEnv
 strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthenV ope v)
 
 eval :: Expr ctx ty -> Env ctx ctxV -> V ctxV ty
-eval (Var n)    env = envLookup n env
-eval (Lam (body :: Expr (arg:ctx) result)) (env :: Env ctx ctxV) = Function f where
-    f :: OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
-    f ope v = eval body (ConsEnv (strengthenEnv ope env) v)
-    -- Q: Any type? 
-    -- TODO: Fix this
+eval (Var n)                                env                  = envLookup n env
+eval (Lam (body :: Expr (arg:ctx) result)) (env :: Env ctx ctxV) = Function f 
+    where
+        f :: OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
+        f ope v = eval body (ConsEnv (strengthenEnv ope env) v)
 
-eval (App f a) env = appV (eval f env) (eval a env) where
-    appV :: V ctxV (Arrow arg ty) -> V ctxV arg -> V ctxV ty
-    appV (Function f') a' = f' (idOPEFromEnv env) a'
+        -- NOTE: Typchecks without strengthening context if don't give f type declaration
+        -- Uses scoped typed variables
+
+
+eval (App f a) env = appV (eval f env) (eval a env) 
+    where
+        --appV :: V ctxV (Arrow arg ty) -> V ctxV arg -> V ctxV ty
+        appV (Function f') a' = f' (idOPEFromEnv env) a'
 
     -- TODO: Fix this
     -- Q: How to set strong ~ ctxV (strong from Function def, ctxV from App def)
@@ -145,18 +151,21 @@ weakenContext _ = wk
 
 reify :: V ctx ty -> NormalExpr ctx ty
 reify (Up nf)      = nf
-reify (Function f) = NormalLam (reify (f ope (evalNeutral' (NeutralVar Head)))) where
+reify (Function f) = NormalLam (reify (f ope (evalNeutral (NeutralVar Head)))) 
+    where
        -- TODO: Fix this
-    ope = weakenContext (Function f)
+        ope :: OPE (arg : ctx) ctx
+        ope = weakenContext (Function f)
 
 evalNeutral :: (SingTy ty) => NeutralExpr ctx ty -> V ctx ty
 evalNeutral = evalNeutral' singTy
 
 evalNeutral' :: STy ty -> NeutralExpr ctx ty -> V ctx ty
-evalNeutral' SBaseTy       n = Up (NormalNeutral n)  
-evalNeutral' (SArrow a b)  (n :: NeutralExpr ctx (Arrow a b)) = Function f where
-    f :: OPE ctx' ctx -> V ctx' a -> V ctx' b
-    f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
+evalNeutral' SBaseTy        n                                 = Up (NormalNeutral n)  
+evalNeutral' (SArrow a b)  (n :: NeutralExpr ctx (Arrow a b)) = Function f 
+    where
+        f :: OPE strongerCtx ctx -> V strongerCtx a -> V strongerCtx b
+        f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
 
 normalise :: Expr '[] ty -> NormalExpr '[] ty
 normalise t = reify (eval t EmptyEnv)
