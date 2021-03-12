@@ -1,5 +1,6 @@
 
 {-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Monotyped.TypeDeclarations (
     Ty(..),
     Elem(..),
@@ -93,7 +94,8 @@ strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthe
 
 eval :: Expr ctx ty -> Env ctx ctxV -> V ctxV ty
 eval (Var n)    env = envLookup n env
-eval (Lam body) env = Function f where
+eval (Lam (body :: Expr (arg:ctx) result)) (env :: Env ctx ctxV) = Function f where
+    f :: OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
     f ope v = eval body (ConsEnv (strengthenEnv ope env) v)
     -- Q: Any type? 
     -- TODO: Fix this
@@ -152,9 +154,8 @@ evalNeutral = evalNeutral' singTy
 
 evalNeutral' :: STy ty -> NeutralExpr ctx ty -> V ctx ty
 evalNeutral' SBaseTy       n = Up (NormalNeutral n)  
-evalNeutral' (SArrow a b)  n = Function f where
-    -- TODO: Type properly (relies on Any)
-    f :: (SingTy result) => OPE ctx1 ctx2 -> V ctx1 arg -> V ctx1 result
+evalNeutral' (SArrow a b)  (n :: NeutralExpr ctx (Arrow a b)) = Function f where
+    f :: OPE ctx' ctx -> V ctx' a -> V ctx' b
     f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
 
 normalise :: Expr '[] ty -> NormalExpr '[] ty
