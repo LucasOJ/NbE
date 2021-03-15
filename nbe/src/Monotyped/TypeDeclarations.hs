@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
-{-# LANGUAGE ScopedTypeVariables, Rank2Types, TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables, RankNTypes #-}
 
 module Monotyped.TypeDeclarations (
     Ty(..),
@@ -8,7 +8,7 @@ module Monotyped.TypeDeclarations (
 ) where 
 
 -- Representation of monotypes
-data Ty = BaseTy | Arrow Ty Ty
+data Ty = BaseTy | Ty :-> Ty
 
 -- Represents proof that a value is in a list
 data Elem :: [a] -> a -> * where
@@ -23,22 +23,24 @@ data Expr :: [Ty] -> Ty -> * where
     -- Given a proof the type ty is in the context ctx we know it's a variable??
     Var :: Elem ctx ty -> Expr ctx ty
     -- Given an expression and context, we can abstract out the first bound variable in the context to make a lambda
-    Lam :: (SingTy arg) => Expr (arg ': ctx) result -> Expr ctx (Arrow arg result)
+    Lam :: (SingTy arg) => Expr (arg ': ctx) result -> Expr ctx (arg :-> result)
     -- Given an expression applied to a term of function type, we can apply the argument to the function
-    App :: Expr ctx (Arrow arg result) -> Expr ctx arg -> Expr ctx result 
+    App :: Expr ctx (arg :-> result) -> Expr ctx arg -> Expr ctx result 
+
+type ClosedExpr ty = Expr '[] ty
 
 -- Target Syntax (Normal Forms)
 data NormalExpr :: [Ty] -> Ty -> * where
     NormalNeutral :: NeutralExpr ctx ty -> NormalExpr ctx ty
-    NormalLam :: NormalExpr (arg ': ctx) result -> NormalExpr ctx (Arrow arg result)
+    NormalLam :: NormalExpr (arg ': ctx) result -> NormalExpr ctx (arg :-> result)
 
 data NeutralExpr :: [Ty] -> Ty -> * where
     NeutralVar :: Elem ctx ty -> NeutralExpr ctx ty
-    NeutralApp :: NeutralExpr ctx (Arrow arg result) -> NormalExpr ctx arg -> NeutralExpr ctx result
+    NeutralApp :: NeutralExpr ctx (arg :-> result) -> NormalExpr ctx arg -> NeutralExpr ctx result
 
 -- Semantics
 
- -- order preserving embeddings
+-- order preserving embeddings
 data OPE :: [Ty] -> [Ty] -> * where
     Empty :: OPE '[] '[]
     Drop  :: OPE ctx1 ctx2 -> OPE (x : ctx1) ctx2
@@ -65,11 +67,11 @@ composeOPEs (Drop v) (Keep u) = Drop (composeOPEs v u)
 composeOPEs (Keep v) (Keep u) = Keep (composeOPEs v u)
 
 data V :: [Ty] -> Ty -> * where 
-    Up :: NormalExpr ctx BaseTy -> V ctx BaseTy
-    Function :: (SingContext weak, SingTy arg) => (forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result) -> V weak (Arrow arg result)
+    Base :: NormalExpr ctx BaseTy -> V ctx BaseTy
+    Function :: (SingContext weak, SingTy arg) => (forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result) -> V weak (arg :-> result)
     
 strengthenV :: (SingContext strong) => OPE strong weak -> V weak ty -> V strong ty
-strengthenV ope (Up nf) = Up (strengthenNormal ope nf)
+strengthenV ope                      (Base nf) = Base (strengthenNormal ope nf)
 strengthenV (ope :: OPE strong weak) (Function (f :: forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result)) = Function f' 
     where
         f' :: (SingContext stronger) => OPE stronger strong -> V stronger arg -> V stronger result
@@ -80,11 +82,11 @@ data Env :: [Ty] -> [Ty] -> * where
     ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
 
 envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty 
-envLookup Head     (ConsEnv _ v)    = v
+envLookup Head     (ConsEnv _    v) = v
 envLookup (Tail n) (ConsEnv prev _) = envLookup n prev
 
 strengthenEnv :: (SingContext c) => OPE c b -> Env a b -> Env a c
-strengthenEnv _    EmptyEnv        = EmptyEnv
+strengthenEnv _   EmptyEnv         = EmptyEnv
 strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthenV ope v)
 
 eval :: (SingContext ctxV) => Expr ctx ty -> Env ctx ctxV -> V ctxV ty
@@ -106,7 +108,7 @@ eval (App f a) env = appV (eval f env) (eval a env)
         idOPEFromEnv _ = idOpe 
 
 reify :: V ctx ty -> NormalExpr ctx ty
-reify (Up nf)      = nf
+reify (Base nf)    = nf
 reify (Function f) = NormalLam (reify (f ope (evalNeutral (NeutralVar Head)))) 
     where
         ope = weakenContext (Function f)
@@ -118,8 +120,8 @@ evalNeutral :: (SingTy ty, SingContext ctx) => NeutralExpr ctx ty -> V ctx ty
 evalNeutral = evalNeutral' singTy
 
 evalNeutral' :: (SingContext ctx) => STy ty -> NeutralExpr ctx ty -> V ctx ty
-evalNeutral' SBaseTy       n                                         = Up (NormalNeutral n)  
-evalNeutral' (SArrow _ _)  (n :: NeutralExpr ctx (Arrow arg result)) = Function f 
+evalNeutral' SBaseTy       n                                         = Base (NormalNeutral n)  
+evalNeutral' (SArrow _ _)  (n :: NeutralExpr ctx (arg :-> result)) = Function f 
     where
         f :: (SingContext strongerCtx) => OPE strongerCtx ctx -> V strongerCtx arg -> V strongerCtx result
         f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
@@ -148,7 +150,7 @@ elemProofToIndex (Tail n) = 1 + elemProofToIndex n
 
 data STy :: Ty -> * where
     SBaseTy :: STy BaseTy
-    SArrow  :: (SingTy a, SingTy b) => STy a -> STy b -> STy (Arrow a b)
+    SArrow  :: (SingTy a, SingTy b) => STy a -> STy b -> STy (a :-> b)
 
 class SingTy a where
     singTy :: STy a 
@@ -156,7 +158,7 @@ class SingTy a where
 instance SingTy 'BaseTy where
     singTy = SBaseTy
 
-instance (SingTy a, SingTy b) => SingTy ('Arrow a b) where
+instance (SingTy a, SingTy b) => SingTy (a :-> b) where
     singTy = SArrow singTy singTy
 
 class SingContext xs where
@@ -173,11 +175,23 @@ instance (SingContext xs) => SingContext (x:xs) where
 
 --- Combinators
 
-identity :: (SingTy a, SingContext ctx) => Expr ctx ('Arrow a a)
+identity :: (SingTy a) => Expr ctx (a :-> a)
 identity = Lam (Var Head)
 
-k1 :: (SingTy a, SingTy b, SingContext ctx) => Expr ctx ('Arrow a ('Arrow b a))
+k1 :: (SingTy a, SingTy b) => Expr ctx (a :-> (b :-> a))
 k1 = Lam (Lam (Var (Tail Head)))
 
-k2 :: (SingTy a, SingTy b, SingContext ctx) => Expr ctx ('Arrow a ('Arrow b b))
+k2 :: (SingTy a, SingTy b) => Expr ctx (a :-> (b :-> b))
 k2 = Lam (Lam (Var Head))
+
+{-
+
+TODO
+
+- Check works with double App
+- Break into multiple files
+- Do open normalisation
+- Remove constraints on functions/GADTS/singletons and see what breaks
+- EXTENTION: way to normalise without giving type?
+
+-}
