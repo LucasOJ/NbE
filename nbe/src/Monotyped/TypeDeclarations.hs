@@ -23,7 +23,7 @@ data Expr :: [Ty] -> Ty -> * where
     -- Given a proof the type ty is in the context ctx we know it's a variable??
     Var :: Elem ctx ty -> Expr ctx ty
     -- Given an expression and context, we can abstract out the first bound variable in the context to make a lambda
-    Lam :: (SingContext ctx) => Expr (arg ': ctx) result -> Expr ctx (Arrow arg result)
+    Lam :: (SingContext ctx, SingTy arg) => Expr (arg ': ctx) result -> Expr ctx (Arrow arg result)
     -- Given an expression applied to a term of function type, we can apply the argument to the function
     App :: Expr ctx (Arrow arg result) -> Expr ctx arg -> Expr ctx result 
 
@@ -69,7 +69,7 @@ composeOPEs (Keep v) (Keep u) = Keep (composeOPEs v u)
 
 data V :: [Ty] -> Ty -> * where 
     Up :: NormalExpr ctx BaseTy -> V ctx BaseTy
-    Function :: (SingContext weak) => (forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result) -> V weak (Arrow arg result)
+    Function :: (SingContext weak, SingTy arg) => (forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result) -> V weak (Arrow arg result)
     
 strengthenV :: (SingContext strong) => OPE strong weak -> V weak ty -> V strong ty
 strengthenV ope (Up nf) = Up (strengthenNormal ope nf)
@@ -121,7 +121,6 @@ reify (Function f) = NormalLam (reify (f ope (evalNeutral (NeutralVar Head))))
     where
        -- TODO: Fix this
         ope = weakenContext (Function f)
-
 
 evalNeutral :: (SingTy ty, SingContext ctx) => NeutralExpr ctx ty -> V ctx ty
 evalNeutral = evalNeutral' singTy
