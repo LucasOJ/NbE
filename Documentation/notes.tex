@@ -125,6 +125,8 @@ OPE is a relation on typing contexts
 
 Defintion of V using OPEs - Haskell vs agda
 
+Need to quantify over 'strong' in function - OPE strong weak is guarentee that strong is a stronger context than weak (if quantified at start end up with values where weak stronger than strong) - need rank2 types extension for nested quantification
+
 Helper functions (composition, strengthing relative to OPE) - explain derivations
 
 \subsection{implementing Eval}
@@ -151,9 +153,16 @@ Explicitly passing as value to pattern match on
 
 Generate implictly using typeclass
 
-problem: locally nameless types in semantics
-\subsection{deBruijn Levels}
-Are GADTs in Haskell flexible enough?
+
+problem : Inferring Any for ctxV (why?)
+
+solution: scoped type variables - universally quantified variables used in type expressions bind over 'where' clause
+
+(More usefully) can 'unpack' refined GADT types so that can create type definitions using refined types.
+
+Qs:
+How does locally nameless work in sematics?
+How does ctxV work in Env?
 
 \cite{modalTypes}
 
