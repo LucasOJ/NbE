@@ -7,8 +7,12 @@ module Monotyped.TypeDeclarations (
     Expr(..)
 ) where 
 
+import qualified Untyped.TypeDeclarations as Untyped (DbExpr(..), Expr(..))
+
 -- Representation of monotypes
-data Ty = BaseTy | Ty :-> Ty
+data Ty = BaseTy | Ty :-> Ty 
+    deriving (Show)
+infixr 9 :->
 
 -- Represents proof that a value is in a list
 data Elem :: [a] -> a -> * where
@@ -18,7 +22,7 @@ data Elem :: [a] -> a -> * where
     Tail :: Elem xs x -> Elem (y ': xs) x
 
 -- Syntactic typed DeBruijn expressions
--- Each of the values is a term, and its type contains the context and type of the term
+-- Each of the values is a term, and its type contains the typing context and type of the term
 data Expr :: [Ty] -> Ty -> * where
     -- Given a proof the type ty is in the context ctx we know it's a variable??
     Var :: Elem ctx ty -> Expr ctx ty
@@ -30,9 +34,10 @@ data Expr :: [Ty] -> Ty -> * where
 type ClosedExpr ty = Expr '[] ty
 
 -- Target Syntax (Normal Forms)
+-- Mirrors Expr other than that you can't apply a term to a Lambda
 data NormalExpr :: [Ty] -> Ty -> * where
     NormalNeutral :: NeutralExpr ctx ty -> NormalExpr ctx ty
-    NormalLam :: NormalExpr (arg ': ctx) result -> NormalExpr ctx (arg :-> result)
+    NormalLam :: NormalExpr (arg ': ctx) result -> NormalExpr ctx (arg :-> result)    
 
 data NeutralExpr :: [Ty] -> Ty -> * where
     NeutralVar :: Elem ctx ty -> NeutralExpr ctx ty
@@ -40,7 +45,10 @@ data NeutralExpr :: [Ty] -> Ty -> * where
 
 -- Semantics
 
--- order preserving embeddings
+-- Order Preserving Embeddings
+-- Relation on typing contexts, OPE A B iff A contains B as a subsequence (ie B is embedded in A)
+-- For any term m, m typeable with context B => m typeable with context A (since A is a stronger context than B)
+-- A value of OPE A B is a proof that B is embedded in A (speicifies how to derive B from A)
 data OPE :: [Ty] -> [Ty] -> * where
     Empty :: OPE '[] '[]
     Drop  :: OPE ctx1 ctx2 -> OPE (x : ctx1) ctx2
@@ -68,7 +76,14 @@ composeOPEs (Keep v) (Keep u) = Keep (composeOPEs v u)
 
 data V :: [Ty] -> Ty -> * where 
     Base :: NormalExpr ctx BaseTy -> V ctx BaseTy
-    Function :: (SingContext weak, SingTy arg) => (forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result) -> V weak (arg :-> result)
+    -- Values with type BaseTy are normal forms
+
+    Function :: (SingContext weak, SingTy arg) => 
+        (forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result) 
+        -- Quantifies over all contexts containing 'weak'
+        -- Requires Rank2Types
+        -> V weak (arg :-> result)
+    -- Values with a function type a -> b are a semantic function from a -> b in any context stronger than that of the value 
     
 strengthenV :: (SingContext strong) => OPE strong weak -> V weak ty -> V strong ty
 strengthenV ope                      (Base nf) = Base (strengthenNormal ope nf)
@@ -77,6 +92,9 @@ strengthenV (ope :: OPE strong weak) (Function (f :: forall strong . (SingContex
         f' :: (SingContext stronger) => OPE stronger strong -> V stronger arg -> V stronger result
         f' ope' = f (composeOPEs ope ope')
 
+-- Semantic environment for evaluation
+-- First typing context is for syntax (grows bigger as evaluate abstractions and more variables bound)
+-- Second typing context is for the semantic terms
 data Env :: [Ty] -> [Ty] -> * where
     EmptyEnv :: Env '[] ctxV
     ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
@@ -89,18 +107,17 @@ strengthenEnv :: (SingContext c) => OPE c b -> Env a b -> Env a c
 strengthenEnv _   EmptyEnv         = EmptyEnv
 strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthenV ope v)
 
-eval :: (SingContext ctxV) => Expr ctx ty -> Env ctx ctxV -> V ctxV ty
-eval (Var n)                                env                  = envLookup n env
-eval (Lam (body :: Expr (arg:ctx) result)) (env :: Env ctx ctxV) = Function f 
+eval :: (SingContext ctxV) => Env ctx ctxV -> Expr ctx ty -> V ctxV ty
+eval env                   (Var n)                               = envLookup n env
+eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
     where
         f :: (SingContext ctxV') => OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
-        f ope v = eval body (ConsEnv (strengthenEnv ope env) v)
+        f ope v = eval (ConsEnv (strengthenEnv ope env) v) body
 
         -- NOTE: Typchecks without strengthening context if don't give f type declaration
         -- Uses scoped typed variables
 
-
-eval (App f a) env = appV (eval f env) (eval a env) 
+eval env (App f a) = appV (eval env f) (eval env a) 
     where
         appV (Function f') a' = f' (idOPEFromEnv env) a'
 
@@ -120,31 +137,31 @@ evalNeutral :: (SingTy ty, SingContext ctx) => NeutralExpr ctx ty -> V ctx ty
 evalNeutral = evalNeutral' singTy
 
 evalNeutral' :: (SingContext ctx) => STy ty -> NeutralExpr ctx ty -> V ctx ty
-evalNeutral' SBaseTy       n                                         = Base (NormalNeutral n)  
+evalNeutral' SBaseTy       n                                       = Base (NormalNeutral n)  
 evalNeutral' (SArrow _ _)  (n :: NeutralExpr ctx (arg :-> result)) = Function f 
     where
         f :: (SingContext strongerCtx) => OPE strongerCtx ctx -> V strongerCtx arg -> V strongerCtx result
         f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
 
-normalise :: Expr '[] ty -> NormalExpr '[] ty
-normalise t = reify (eval t EmptyEnv)
+normalise :: (SingContext ctx) => Expr ctx ty -> NormalExpr ctx ty
+normalise = reify . eval initialEnv
 
 --- Normal form display
 
-comp :: Expr '[] ty -> String
-comp = displayNormal . normalise
+normaliseDB :: (SingContext ctx) => Expr ctx ty -> Untyped.DbExpr 
+normaliseDB = normalToDB . normalise
 
-displayNormal :: NormalExpr ctx ty -> String 
-displayNormal (NormalNeutral n) = displayNeutral n
-displayNormal (NormalLam body)  = "Lam ( " ++ displayNormal body ++ " )"
+normalToDB  :: NormalExpr ctx ty -> Untyped.DbExpr 
+normalToDB (NormalNeutral n) = neutralToDB n
+normalToDB (NormalLam body)  = Untyped.DbLam (normalToDB body)
 
-displayNeutral :: NeutralExpr ctx ty -> String 
-displayNeutral (NeutralVar elemProof) = show (elemProofToIndex elemProof)
-displayNeutral (NeutralApp m n)       = "App ( " ++ displayNeutral m ++ " ) ( " ++ displayNormal n ++ " )"
+neutralToDB :: NeutralExpr ctx ty -> Untyped.DbExpr 
+neutralToDB (NeutralVar v)   = Untyped.DbVar (elemToIndex v)
+neutralToDB (NeutralApp m n) = Untyped.DbApp (neutralToDB m) (normalToDB n)
 
-elemProofToIndex :: Elem xs x -> Int
-elemProofToIndex Head     = 0
-elemProofToIndex (Tail n) = 1 + elemProofToIndex n
+elemToIndex :: Elem xs x -> Int
+elemToIndex Head     = 0
+elemToIndex (Tail n) = 1 + elemToIndex n
 
 --- Singletons
 
@@ -161,37 +178,57 @@ instance SingTy 'BaseTy where
 instance (SingTy a, SingTy b) => SingTy (a :-> b) where
     singTy = SArrow singTy singTy
 
-class SingContext xs where
-    idOpe :: OPE xs xs
-    wk :: OPE (x:xs) xs
+class SingContext ctx where
+    idOpe :: OPE ctx ctx
+    wk :: OPE (x:ctx) ctx
+    wk = Drop idOpe
+    initialEnv :: Env ctx ctx
 
 instance SingContext '[] where
     idOpe = Empty
-    wk = Drop idOpe
+    initialEnv = EmptyEnv
 
-instance (SingContext xs) => SingContext (x:xs) where
+instance (SingContext xs, SingTy x) => SingContext (x:xs) where
     idOpe = Keep idOpe
-    wk = Drop idOpe
+    initialEnv = ConsEnv (strengthenEnv wk initialEnv) (evalNeutral (NeutralVar Head))
+    -- Q: Disadvantage of moving complexity into class definition
+    -- Q: Is the alternative of pattern matching on singleton (ie evalNeutral) equivalent?
 
 --- Combinators
 
 identity :: (SingTy a) => Expr ctx (a :-> a)
 identity = Lam (Var Head)
 
-k1 :: (SingTy a, SingTy b) => Expr ctx (a :-> (b :-> a))
+k1 :: (SingTy a, SingTy b) => Expr ctx (a :-> b :-> a)
 k1 = Lam (Lam (Var (Tail Head)))
 
-k2 :: (SingTy a, SingTy b) => Expr ctx (a :-> (b :-> b))
+k2 :: (SingTy a, SingTy b) => Expr ctx (a :-> b :-> b)
 k2 = Lam (Lam (Var Head))
 
 {-
 
 TODO
 
-- Check works with double App
 - Break into multiple files
-- Do open normalisation
 - Remove constraints on functions/GADTS/singletons and see what breaks
-- EXTENTION: way to normalise without giving type?
+- Q: Way to normalise without giving type?
+    Not possible since eta-long form depends on type, difference between:
+    
+    comp (identity :: ClosedExpr (BaseTy :-> BaseTy))
+      = "Lam ( 0 )"
+
+    comp (identity :: ClosedExpr ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy))
+        = "Lam ( Lam ( App ( 1 ) ( 0 ) ) )"
+
+    and 
+
+
+-- Q: When normalising arrow terms puts into eta-long form (not nescessarily beta normal)
+
+-- eg comp (identity :: ClosedExpr ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy))
+        = "Lam ( Lam ( App ( 1 ) ( 0 ) ) )"
+
+--    comp  (Var Head :: Expr '[BaseTy :-> BaseTy] (BaseTy :-> BaseTy))
+        = "Lam ( App ( 1 ) ( 0 ) )"
 
 -}
