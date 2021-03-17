@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{dissertation}[2012/05/04, Daniel Page <Daniel.Page@bristol.ac.uk>]
+\ProvidesClass{dissertation}[2021/03/21, Lucas O'Dowd-Jones <Lucas.ODowd-Jones@bristol.ac.uk>]
 
 % =============================================================================
 
@@ -76,7 +76,7 @@
 
 % configure hyperref
 
-\hypersetup{colorlinks=true,bookmarks=false,urlcolor=red}
+\hypersetup{colorlinks=true,urlcolor=red}
 
 % configure algorithm2e
 

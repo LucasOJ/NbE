@@ -20,45 +20,25 @@
 %   (so 2014 rather than the academic year, say 2013/14 say).
 
 \documentclass[ % the name of the author
-                    author={Daniel Page},
+                    author={Lucas O'Dowd-Jones},
                 % the name of the supervisor
-                supervisor={Dr. Andrew Calway},
+                supervisor={Dr. Alex Kavvos},
                 % the degree programme
-                    degree={BSc},
+                    degree={MEng},
                 % the dissertation    title (which cannot be blank)
-                     title={Some Structural Guidelines for CS BSc Dissertations},
+                     title={Variations on Normalisation by Evaluation for the Lambda Calculus},
                 % the dissertation subtitle (which can    be blank)
                   subtitle={},
                 % the dissertation     type
-                      type={software development},
+                      type={programming languages},
                 % the year of submission
-                      year={2014} ]{dissertation}
+                      year={2021} ]{dissertation}
+
+\usepackage{amsmath}
+\usepackage{biblatex}
+\addbibresource{bibliography.bib}
 
 \begin{document}
-
-% =============================================================================
-
-% This section simply introduces the structural guidelines.  It can clearly
-% be deleted (or commented out) if you use the file as a template for your
-% own dissertation: everything following it is in the correct order to use 
-% as is.
-
-\section*{Prelude}
-\thispagestyle{empty}
-
-A typical dissertation will be structured according to (somewhat) standard 
-sections, described in what follows.  However, it is hard and perhaps even 
-counter-productive to generalise: the goal is {\em not} to be prescriptive, 
-but simply to act as a guideline.  In particular, each page count given is
-important but {\em not} absolute: their aim is simply to highlight that a 
-clear, concise description is better than a rambling alternative that makes
-it hard to separate important content and facts from trivia.
-
-You can use this document as a \LaTeX-based~\cite{latexbook1,latexbook2} 
-template for your own dissertation by simply deleting extraneous sections
-and content; keep in mind that the associated {\tt Makefile} could be of
-use, in particular because it automatically executes \mbox{\BibTeX} to 
-deal with the associated bibliography. Alternatively, upload your zip folder to Overleaf (collaborative online \LaTeX editor and compiler) 
 
 % =============================================================================
 
@@ -534,7 +514,7 @@ enough attention.  Ideally, the chapter will consist of three parts:
 
 \backmatter
 
-\bibliography{dissertation}
+\printbibliography
 
 % -----------------------------------------------------------------------------
 
