@@ -26,7 +26,7 @@
                 % the degree programme
                     degree={MEng},
                 % the dissertation    title (which cannot be blank)
-                     title={Variations on Normalisation by Evaluation for the Lambda Calculus},
+                     title={Variations on Normalisation by Evaluation in Haskell},
                 % the dissertation subtitle (which can    be blank)
                   subtitle={},
                 % the dissertation     type
@@ -77,8 +77,7 @@
 
 \chapter*{Executive Summary}
 
-{\bf A compulsory section, of at most $1$ page} 
-\vspace{1cm} 
+% {\bf A compulsory section, of at most $1$ page} 
 
 \noindent
 This section should pr\'{e}cis the project context, aims and objectives,
@@ -123,48 +122,9 @@ an might be as follows:
 
 % -----------------------------------------------------------------------------
 
-\chapter*{Summary of Changes}
-
-{\bf A conditional section, of at most $1$ page} 
-\vspace{1cm} 
-
-Iff. the dissertation represents a resubmission (e.g., as the result of
-a resit), this section is compulsory: the content should summarise all
-non-trivial changes made to the initial submission.  Otherwise you can
-omit it, since a summary of this type is clearly nonsensical.
-
-When included, the section will ideally be used to highlight additional
-work completed, and address criticism raised in any associated feedback.
-Clearly it is difficult to give generic advice about how to do so, but
-an example might be as follows:
-
-\begin{quote}
-\noindent
-\begin{itemize}
-\item Feedback from the initial submission criticised the design and 
-      implementation of my genetic algorithm, stating ``there seems 
-      to have been no attention to computational complexity during the
-      design, and obvious methods of optimisation are missing within
-      the resulting implementation''.  Chapter $3$ now includes a
-      comprehensive analysis of the algorithm, in terms of both time
-      and space.  While I have not altered the algorithm itself, I
-      have included a cache mechanism (also detailed in Chapter $3$)
-      that provides a significant improvement in average run-time.
-\item I added a feature in my implementation to allow automatic rather
-      than manual selection of various parameters; the experimental
-      results in Chapter $4$ have been updated to reflect this.
-\item Questions after the presentation highlighted a range of related
-      work that I had not considered: I have make a number of updates 
-      to Chapter $2$, resolving this issue.
-\end{itemize}
-\end{quote}
-
-% -----------------------------------------------------------------------------
-
 \chapter*{Supporting Technologies}
 
-{\bf A compulsory section, of at most $1$ page}
-\vspace{1cm} 
+% {\bf A compulsory section, of at most $1$ page}
 
 \noindent
 This section should present a detailed summary, in bullet point form, 
@@ -197,8 +157,7 @@ dissertation''); an example is as follows:
 
 \chapter*{Notation and Acronyms}
 
-{\bf An optional section, of roughly $1$ or $2$ pages}
-\vspace{1cm} 
+% {\bf An optional section, of roughly $1$ or $2$ pages}
 
 \noindent
 Any well written document will introduce notation and acronyms before
@@ -230,8 +189,7 @@ $x_i$               &:     & the $i$-th bit of some binary sequence $x$, st. $x_
 
 \chapter*{Acknowledgements}
 
-{\bf An optional section, of at most $1$ page}
-\vspace{1cm} 
+% {\bf An optional section, of at most $1$ page}
 
 \noindent
 It is common practice (although totally optional) to acknowledge any
@@ -258,187 +216,31 @@ advice or time), and so on.
 
 % -----------------------------------------------------------------------------
 
-\chapter{Contextual Background}
-\label{chap:context}
+\input{chapters/ch1Introduction.tex}
 
-{\bf A compulsory chapter,     of roughly $5$ pages}
-\vspace{1cm} 
 
-\noindent
-This chapter should describe the project context, and motivate each of
-the proposed aims and objectives.  Ideally, it is written at a fairly 
-high-level, and easily understood by a reader who is technically 
-competent but not an expert in the topic itself.
-
-In short, the goal is to answer three questions for the reader.  First, 
-what is the project topic, or problem being investigated?  Second, why 
-is the topic important, or rather why should the reader care about it?  
-For example, why there is a need for this project (e.g., lack of similar 
-software or deficiency in existing software), who will benefit from the 
-project and in what way (e.g., end-users, or software developers) what 
-work does the project build on and why is the selected approach either
-important and/or interesting (e.g., fills a gap in literature, applies
-results from another field to a new problem).  Finally, what are the 
-central challenges involved and why are they significant? 
- 
-The chapter should conclude with a concise bullet point list that 
-summarises the aims and objectives.  For example:
-
-\begin{quote}
-\noindent
-The high-level objective of this project is to reduce the performance 
-gap between hardware and software implementations of modular arithmetic.  
-More specifically, the concrete aims are:
-
-\begin{enumerate}
-\item Research and survey literature on public-key cryptography and
-      identify the state of the art in exponentiation algorithms.
-\item Improve the state of the art algorithm so that it can be used
-      in an effective and flexible way on constrained devices.
-\item Implement a framework for describing exponentiation algorithms
-      and populate it with suitable examples from the literature on 
-      an ARM7 platform.
-\item Use the framework to perform a study of algorithm performance
-      in terms of time and space, and show the proposed improvements
-      are worthwhile.
-\end{enumerate}
-\end{quote}
 
 % -----------------------------------------------------------------------------
 
-\chapter{Technical Background}
-\label{chap:technical}
-
-{\bf A compulsory chapter,     of roughly $10$ pages} 
-\vspace{1cm} 
-
-\noindent
-This chapter is intended to describe the technical basis on which execution
-of the project depends.  The goal is to provide a detailed explanation of
-the specific problem at hand, and existing work that is relevant (e.g., an
-existing algorithm that you use, alternative solutions proposed, supporting
-technologies).  
-
-Per the same advice in the handbook, note there is a subtly difference from
-this and a full-blown literature review (or survey).  The latter might try
-to capture and organise (e.g., categorise somehow) {\em all} related work,
-potentially offering meta-analysis, whereas here the goal is simple to
-ensure the dissertation is self-contained.  Put another way, after reading 
-this chapter a non-expert reader should have obtained enough background to 
-understand what {\em you} have done (by reading subsequent sections), then 
-accurately assess your work.  You might view an additional goal as giving 
-the reader confidence that you are able to absorb, understand and clearly 
-communicate highly technical material.
+\chapter{NbE for the Untyped Lambda Calculus}
+\label{chap:untypednbe}
 
 % -----------------------------------------------------------------------------
 
-\chapter{Project Execution}
-\label{chap:execution}
+\chapter{Representation of the Typed Lambda Calculus}
+\label{chap:typedlamadacalculus}
 
-{\bf A topic-specific chapter, of roughly $15$ pages} 
-\vspace{1cm} 
+% -----------------------------------------------------------------------------
 
-\noindent
-This chapter is intended to describe what you did: the goal is to explain
-the main activity or activities, of any type, which constituted your work 
-during the project.  The content is highly topic-specific, but for many 
-projects it will make sense to split the chapter into two sections: one 
-will discuss the design of something (e.g., some hardware or software, or 
-an algorithm, or experiment), including any rationale or decisions made, 
-and the other will discuss how this design was realised via some form of 
-implementation.  
-
-This is, of course, far from ideal for {\em many} project topics.  Some
-situations which clearly require a different approach include:
-
-\begin{itemize}
-\item In a project where asymptotic analysis of some algorithm is the goal,
-      there is no real ``design and implementation'' in a traditional sense
-      even though the activity of analysis is clearly within the remit of
-      this chapter.
-\item In a project where analysis of some results is as major, or a more
-      major goal than the implementation that produced them, it might be
-      sensible to merge this chapter with the next one: the main activity 
-      is such that discussion of the results cannot be viewed separately.
-\end{itemize}
-
-\noindent
-Note that it is common to include evidence of ``best practice'' project 
-management (e.g., use of version control, choice of programming language 
-and so on).  Rather than simply a rote list, make sure any such content 
-is useful and/or informative in some way: for example, if there was a 
-decision to be made then explain the trade-offs and implications 
-involved.
-
-\section{Example Section}
-
-This is an example section; 
-the following content is auto-generated dummy text.
-\lipsum
-
-\subsection{Example Sub-section}
-
-\begin{figure}[t]
-\centering
-foo
-\caption{This is an example figure.}
-\label{fig}
-\end{figure}
-
-\begin{table}[t]
-\centering
-\begin{tabular}{|cc|c|}
-\hline
-foo      & bar      & baz      \\
-\hline
-$0     $ & $0     $ & $0     $ \\
-$1     $ & $1     $ & $1     $ \\
-$\vdots$ & $\vdots$ & $\vdots$ \\
-$9     $ & $9     $ & $9     $ \\
-\hline
-\end{tabular}
-\caption{This is an example table.}
-\label{tab}
-\end{table}
-
-\begin{algorithm}[t]
-\For{$i=0$ {\bf upto} $n$}{
-  $t_i \leftarrow 0$\;
-}
-\caption{This is an example algorithm.}
-\label{alg}
-\end{algorithm}
-
-\begin{lstlisting}[float={t},caption={This is an example listing.},label={lst},language=C]
-for( i = 0; i < n; i++ ) {
-  t[ i ] = 0;
-}
-\end{lstlisting}
-
-This is an example sub-section;
-the following content is auto-generated dummy text.
-Notice the examples in Figure~\ref{fig}, Table~\ref{tab}, Algorithm~\ref{alg}
-and Listing~\ref{lst}.
-\lipsum
-
-\subsubsection{Example Sub-sub-section}
-
-This is an example sub-sub-section;
-the following content is auto-generated dummy text.
-\lipsum
-
-\paragraph{Example paragraph.}
-
-This is an example paragraph; note the trailing full-stop in the title,
-which is intended to ensure it does not run into the text.
+\chapter{NbE for the Typed Lambda Calculus}
+\label{chap:typednbe}
 
 % -----------------------------------------------------------------------------
 
 \chapter{Critical Evaluation}
 \label{chap:evaluation}
 
-{\bf A topic-specific chapter, of roughly $15$ pages} 
-\vspace{1cm} 
+%% {\bf A topic-specific chapter, of roughly $15$ pages} 
 
 \noindent
 This chapter is intended to evaluate what you did.  The content is highly 
@@ -470,8 +272,7 @@ in a suitable manner.
 \chapter{Conclusion}
 \label{chap:conclusion}
 
-{\bf A compulsory chapter,     of roughly $5$ pages} 
-\vspace{1cm} 
+% {\bf A compulsory chapter,     of roughly $5$ pages} 
 
 \noindent
 The concluding chapter of a dissertation is often underutilised because it 
@@ -528,16 +329,7 @@ enough attention.  Ideally, the chapter will consist of three parts:
 \label{appx:example}
 
 Content which is not central to, but may enhance the dissertation can be 
-included in one or more appendices; examples include, but are not limited
-to
-
-\begin{itemize}
-\item lengthy mathematical proofs, numerical or graphical results which 
-      are summarised in the main body,
-\item sample or example calculations, 
-      and
-\item results of user studies or questionnaires.
-\end{itemize}
+included in one or more appendicies.
 
 \noindent
 Note that in line with most research conferences, the marking panel is not
