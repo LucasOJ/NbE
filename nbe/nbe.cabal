@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 86414f88d0f452ca8d16d03c08e2f1b8c3e2e8764f3995b0b3865334c0132ac3
+-- hash: 925ceba8e6e8d4ba135ae28367149051851cf6cc730311239064d0deb938e8bc
 
 name:           nbe
 version:        0.1.0.0
@@ -61,6 +61,7 @@ test-suite nbe-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      MonotypedTests.ChurchNumerals
       Paths_nbe
   hs-source-dirs:
       test

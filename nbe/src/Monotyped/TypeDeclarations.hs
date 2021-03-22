@@ -4,7 +4,10 @@
 module Monotyped.TypeDeclarations (
     Ty(..),
     Elem(..),
-    Expr(..)
+    Expr(..),
+    ClosedExpr,
+    normalise,
+    normaliseDB
 ) where 
 
 import qualified Untyped.TypeDeclarations as Untyped (DbExpr(..), Expr(..))
@@ -199,11 +202,14 @@ instance (SingContext xs, SingTy x) => SingContext (x:xs) where
 identity :: (SingTy a) => Expr ctx (a :-> a)
 identity = Lam (Var Head)
 
-k1 :: (SingTy a, SingTy b) => Expr ctx (a :-> b :-> a)
-k1 = Lam (Lam (Var (Tail Head)))
+k :: (SingTy a, SingTy b) => Expr ctx (a :-> b :-> a)
+k = Lam (Lam (Var (Tail Head)))
 
-k2 :: (SingTy a, SingTy b) => Expr ctx (a :-> b :-> b)
-k2 = Lam (Lam (Var Head))
+true :: Expr ctx ('BaseTy :-> 'BaseTy :-> 'BaseTy)
+true = Lam (Lam (Var (Tail Head)))
+
+false :: Expr ctx ('BaseTy :-> 'BaseTy :-> 'BaseTy)
+false = Lam (Lam (Var Head))
 
 {-
 

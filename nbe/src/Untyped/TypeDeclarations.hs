@@ -17,4 +17,4 @@ data Expr = ExpVar Name
 data DbExpr = DbVar Int
             | DbLam DbExpr
             | DbApp DbExpr DbExpr
-    deriving (Read, Show)
+    deriving (Read, Show, Eq)
