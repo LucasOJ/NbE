@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
+{-# LANGUAGE DataKinds, TypeOperators#-}
 module ChurchNumerals () where
 
 import Monotyped.TypeDeclarations (
@@ -9,12 +9,9 @@ import Monotyped.TypeDeclarations (
     normaliseDB
     )
 
-
-
 type ChurchNumeralTy = ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy)
 
 type ChurchNumeral = ClosedExpr ChurchNumeralTy
-
 
 app2 :: Expr ctx (a :-> b :-> c) -> Expr ctx a -> Expr ctx b -> Expr ctx c
 app2 f x y = App (App f x) y 
@@ -32,7 +29,7 @@ toChurchNumeral i = App churchSucc (toChurchNumeral (i - 1))
         x = Var Head
     
 addChurchNumeral :: ChurchNumeral -> ChurchNumeral -> ChurchNumeral
-addChurchNumeral i j = App (App churchAdd i) j
+addChurchNumeral = app2 churchAdd
     where 
         churchAdd :: ClosedExpr (ChurchNumeralTy :-> ChurchNumeralTy :-> ChurchNumeralTy)
         churchAdd = Lam (Lam (Lam (Lam (app2 m f (app2 n f x)))))
@@ -41,13 +38,20 @@ addChurchNumeral i j = App (App churchAdd i) j
         n = Var (Tail (Tail Head))
         f = Var (Tail Head)
         x = Var Head 
-{-
 
-TODO:
-- church multiplication
-- church exponentiation
-- church booleans
-- testing 
-    - quickcheck over values
+prop_add :: Int -> Int -> Bool 
+prop_add m n = normaliseDB (addChurchNumeral (toChurchNumeral m) (toChurchNumeral n)) == normaliseDB (toChurchNumeral (m + n))
 
--}
+multChurchNumeral :: ChurchNumeral -> ChurchNumeral -> ChurchNumeral
+multChurchNumeral = app2 churchMult
+    where 
+        churchMult :: ClosedExpr (ChurchNumeralTy :-> ChurchNumeralTy :-> ChurchNumeralTy)
+        churchMult = Lam (Lam (Lam (Lam (app2 m (App n f) x))))
+
+        m = Var (Tail (Tail (Tail Head)))
+        n = Var (Tail (Tail Head))
+        f = Var (Tail Head)
+        x = Var Head 
+
+prop_mult :: Int -> Int -> Bool 
+prop_mult m n = normaliseDB (multChurchNumeral (toChurchNumeral m) (toChurchNumeral n)) == normaliseDB (toChurchNumeral (m * n))
