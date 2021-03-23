@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 925ceba8e6e8d4ba135ae28367149051851cf6cc730311239064d0deb938e8bc
+-- hash: e96c76c30de21dacf71e2f47f02ee76c4b9515f9c6a98e64cd3cff9d408b972c
 
 name:           nbe
 version:        0.1.0.0
@@ -38,7 +38,8 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
     , containers
     , mtl
   default-language: Haskell2010
@@ -51,7 +52,8 @@ executable nbe-exe
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
     , containers
     , mtl
     , nbe
@@ -61,13 +63,15 @@ test-suite nbe-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      MonotypedTests.ChurchBooleans
       MonotypedTests.ChurchNumerals
       Paths_nbe
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
     , containers
     , mtl
     , nbe

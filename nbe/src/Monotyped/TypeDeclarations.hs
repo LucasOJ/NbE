@@ -7,7 +7,8 @@ module Monotyped.TypeDeclarations (
     Expr(..),
     ClosedExpr,
     normalise,
-    normaliseDB
+    normaliseDB,
+    SingTy
 ) where 
 
 import qualified Untyped.TypeDeclarations as Untyped (DbExpr(..), Expr(..))
