@@ -37,8 +37,25 @@
 \usepackage{amsmath}
 \usepackage{biblatex}
 \addbibresource{bibliography.bib}
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=[0]\bfseries\color{bittersweet},
+  keywordstyle=[1]\bfseries\color{teal},
+  keywordstyle=[2]\bfseries,
+  columns=spaceflexible,
+  morekeywords=[0]{data, where, type, class, instance},
+  morekeywords=[1]{Nat, List, Sorted, Uniq, Eq, Ty, BaseTy},
+  morekeywords=[2]{Z, S, True},
+  mathescape=true,
+  keepspaces=true,
+  aboveskip=10pt,
+  belowskip=10pt
+}
 
 \begin{document}
+\definecolor{teal}{rgb}{0.0, 0.5, 0.5}
+\definecolor{bittersweet}{rgb}{1.0, 0.44, 0.37}
 
 % =============================================================================
 
