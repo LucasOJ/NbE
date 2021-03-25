@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e96c76c30de21dacf71e2f47f02ee76c4b9515f9c6a98e64cd3cff9d408b972c
+-- hash: 0bf8ed0e0c6d78b1abdcbcfbd7be7aa4b67f4b6e8c25b6d01dd7206d747f807c
 
 name:           nbe
 version:        0.1.0.0
@@ -31,6 +31,7 @@ library
       Monotyped.TypeDeclarations
       Untyped.DeBruijnNbE
       Untyped.GensymNbE
+      Untyped.Reduction
       Untyped.TypeDeclarations
       Untyped.Utils
   other-modules:

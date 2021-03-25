@@ -25,6 +25,11 @@ data Elem :: [a] -> a -> * where
     -- The proof is still valid is we prepend an element to the list
     Tail :: Elem xs x -> Elem (y ': xs) x
 
+instance Show (Elem xs x) where
+    show Head = "Head"
+    show (Tail Head) = "Tail Head"
+    show (Tail n) = "Tail (" ++ show n ++ ")" 
+
 -- Syntactic typed DeBruijn expressions
 -- Each of the values is a term, and its type contains the typing context and type of the term
 data Expr :: [Ty] -> Ty -> * where
@@ -34,6 +39,12 @@ data Expr :: [Ty] -> Ty -> * where
     Lam :: (SingTy arg) => Expr (arg ': ctx) result -> Expr ctx (arg :-> result)
     -- Given an expression applied to a term of function type, we can apply the argument to the function
     App :: Expr ctx (arg :-> result) -> Expr ctx arg -> Expr ctx result 
+
+instance Show (Expr ctx ty) where
+    show (Var Head) = "Var Head"
+    show (Var elem) = "Var (" ++ show elem ++ ")"
+    show (Lam body) = "Lam (" ++ show body ++ ")"
+    show (App m n)  = "App (" ++ show m ++ ") (" ++ show n ++ ")"
 
 type ClosedExpr ty = Expr '[] ty
 
@@ -218,24 +229,5 @@ TODO
 
 - Break into multiple files
 - Remove constraints on functions/GADTS/singletons and see what breaks
-- Q: Way to normalise without giving type?
-    Not possible since eta-long form depends on type, difference between:
-    
-    comp (identity :: ClosedExpr (BaseTy :-> BaseTy))
-      = "Lam ( 0 )"
-
-    comp (identity :: ClosedExpr ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy))
-        = "Lam ( Lam ( App ( 1 ) ( 0 ) ) )"
-
-    and 
-
-
--- Q: When normalising arrow terms puts into eta-long form (not nescessarily beta normal)
-
--- eg comp (identity :: ClosedExpr ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy))
-        = "Lam ( Lam ( App ( 1 ) ( 0 ) ) )"
-
---    comp  (Var Head :: Expr '[BaseTy :-> BaseTy] (BaseTy :-> BaseTy))
-        = "Lam ( App ( 1 ) ( 0 ) )"
 
 -}

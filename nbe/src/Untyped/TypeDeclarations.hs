@@ -11,7 +11,7 @@ type Name = String
 data Expr = ExpVar Name
           | ExpLam Name Expr
           | ExpApp Expr Expr
-    deriving (Read, Show)
+    deriving (Read, Show, Eq)
 
 -- deBruijn index expressions
 data DbExpr = DbVar Int
