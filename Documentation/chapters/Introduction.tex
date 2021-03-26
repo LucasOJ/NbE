@@ -2,83 +2,40 @@
 \label{chap:introduction}
 
 % Start with want to implement functional language
+To implement a functional programming language, we need a normalisation function that maps each expression in the functional language to its normal form. [EXPLAIN WHAT NORMAL FORM IS?]
 % We use NbE
+In this dissertation we explore various implementations of normalisation by evaluation (NbE) for the lambda calculus.
+
 % What/how it works roughly
+NbE proceeds by interpreting each term as an element of a semantic set, where computation is easier to perform, before "reifying" the semantic value back into the set of normal terms. All $\beta$-equal terms "evaluate" to the same semantic value, so $\beta$-equal terms normalise to the same normal form.
+
 % Why do we care
     % Modern
+NbE is a modern alternative to normalisation by reduction; a technique based on syntactic rewriting. Since the foundations of NbE are mathematical, we can prove that our implementation is correct and study its behaviour formally. [CITE]. Proving that the implementations are fully correct is beyond the scope of this project, but we do use types as machine-checked proof that our implementation satisfies certain correctness properties.
+% TODO: Make these points flow 
     % Dependent type theories (only namecheck)
+Dependent type theories [NAMECHECK] use NbE to check for equality between dependent types by normalising type-level programs.
     % Tests limit of implementation lanague (Haskell)
-    % Closer to maths
+NbE takes advantage of advanced features in the implementation language, so serves as a useful benchmark for the strength and expressiveness of functional languages.
     % Conceptual understanding
+NbE can improve the speed of compilation of functional languages. \cite{efficientNbE}
 
 % --roadmap
 % What do we do in the project
-    % "Explore various implementations"
-    % NbE for untyped lc (2 variations, abel trick (dB indicies + levels))
-    % NbE for simply typed LC ("Cutting edge features")
-        % GADTs
-        % Type families
-        % Extentions list
+First we present two approaches for NbE of the untyped lambda calculus. The first implementation generates fresh variables during reification, which introduces global state into the program. State can be difficult to reason about and introduces complexity when testing, so often leads to errors in programs. These issues motivate a second implementation of NbE which uses de Bruijn indices and levels to represent variable binding in terms instead of named lambda terms, eliminating the need for fresh variable generation and state. We present a simple method for translating between named-variable terms and de Bruijn terms, since named-variable terms are easier to read. 
+
+Next we explore NbE for the simply typed lambda calculus by porting an implementation written in Agda to Haskell, utilising cutting edge features available through compiler extensions. GADTs are used in conjunction with the DataKinds and PolyKinds extensions to define terms that are well-typed by construction. For the implementation of the normalisation function itself we need the RankNTypes extension, which gives finer control over quantification in polymorphic type signatures, and ScopedTypeVariables, to bind type variables within function bodies. To emulate reflection of dependent types from the type level to the value level at runtime we explore the singleton pattern.
 
 % -- Why awesome
 % Why we did it this way 
+
     % Haskell not depdently typed (GADTs close as can get)
-    % R. Eisenberg + community plan for full dependent types
-    % Andras Kovacs implementation in Agda + port to Haskell
-        % point is to discuss problems and workarounds
+Haskell does not support full dependent types, however the Haskell community are actively working to integrate dependent types through Dependent Haskell\cite{DH}, following a proposal by Richard Eisenberg \cite{GADTs}. 
+    % GADTS enable programs as proofs, machine checked correctness
+However, Haskell developers can already emulate the features of dependent types with GADTs and other cutting edge compiler extensions which strengthen the type system. Although these solutions are not as elegant as full dependent types, they allow developers to write complex-typed programs not possible in vanilla Haskell.
 
-% TODO: Introduce more foundations in logic
-
-%   Intro to Dependent types
-Dependent types are types that can depenend on values. For example, the return type of a dependently typed function can depend on the value of its argument. This feature is useful as it allowers developers to construct more presise and expressive definitions, moving errors from run-time to compile-time.
-
-% Type checking depent types
-Naturally, this dependence on run-time values increases the complexity of static type-checking. 
-Since the types themselves may contain programs, for the compiler to validate equality between types, it needs to effficiently validate equality between programs at the type level.
-% Q: How to programs arise from a dependence on values?
-% TODO: Rephrase this (says LC twice)
-In functional programming lanaguages, programs are terms of the Lambda Calculus, so the problem reduces to determinig equality between Lambda Calculus terms. 
-
-
-We say that two terms are $\beta$-convertible if their normal forms are syntactically identical (providing they exist). Normal forms are the simplest syntactic representation of lambda calculus terms which preserve their semantic meaning. All terms with the same normal form will produce identical outputs for all inputs when interpreted as functions, so are semantically equal. To deduce equality between type-level terms we can simply compare their $\beta$-normals forms.
-
-However, the standard syntactic-rewriting method of computing normal forms (normalisation by reduction) fails to satisfy desireable properies we would like a dependent type-checker to have:
-\begin{itemize}
-    % TODO: Rephrase this
-    \item 
-    It would be most natural for our definition of equality to be undirected, however normalistion by reduction is a directed technique.
-
-    %   eta-long form not directed 
-    % Q: What is desire for eta-long form?
-    \item We would like to normlise terms into eta-long form, however ... 
-    
-    %   Not efficient??
-    \item Performance is always a priority for compilers so more effficient normalisation would be preferable.
-    
-    %   Rewriting difficult to reason about mathematically (operating on syntax)
-    \item The ability to mathematically reason about our system is essential for ensuring correctness. Normalisation by reduction is based on syntax operations, which makes such rigorous reasoning difficult.
-\end{itemize}
-
-% Resolution: NbE
-Instead we consider an alternative method of normalising lamda terms: normalisation by evaluation. NbE proceeds by interpreting the term as an element of a semantic set, before "reifying" the semantic value back into the set of normal lambda terms. 
-
-% TODO:rephrase
-This technique is undirected ...
-% TODO:rephrase
-The  $\beta$-normal forms that are also $\eta$-long
-Crucially, the technique is built from mathematics, using mathematical operations rather than syntactic ones, so is enforced by theory.
-
-% What is this project about?
-
-%   Modern compiler extentions support more complex programs at type level
-In this dissertation, we construct and analyse varying implementations of NbE in Haskell, a lazy functional programming lanaguage. Haskell is the most widely adopted pure functional programming lanaguage, however was not intended to support complex dependent types. In fact, to support compiler optimisations Haskell erases all types from the program after type-checking, so at run-time all type information is lost. To add stronger typing features, the developers of Haskell have realeased mordern compiler extentions. 
-
-In this project we test these modern, advanced features through implementating vartations of NbE for both the untyped and typed Lambda Calculus. 
-
-The aims of this dissertation are to:
-\begin{itemize}
-    \item Implement normalisation by evaluation for the typed and untyped Lambda Calculus in Haskell
-    
-    % TODO: Rephase this
-    \item Investigate modern typing features of Haskell, particularly how useful they are in developing dependently typed programs and how the implementation compares to dependently typed languages.
-\end{itemize}
+The aims of this project are:
+\begin{enumerate}
+    \item To produce various implementations of NbE in Haskell
+    \item To explore how successful modern features of Haskell are in implementing an algorithm with complex types.
+\end{enumerate}
