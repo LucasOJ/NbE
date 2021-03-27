@@ -1,0 +1,33 @@
+\chapter{Representation of the Typed Lambda Calculus}
+\label{chap:typedlamadacalculus}
+
+TypeOperators allows us to define types using infix operator :->.
+'infixr :-> 9' sets strongest right assoicativity (matches usual convention that a -> b -> c ~ a -> (b -> c))
+
+Problem: Only want to normalise well typed terms.
+Criteria: 
+(1) Exclude $\lambda x . y$ - y free variable so not in typing context
+(2) Exclude $\lambda x.xx$ - untypable (types are finite)
+
+Problem with standard terms - can't carry type information
+
+\subsection{Typed Term solution - GADTs}
+
+\cite{GADTs}
+Explicit type constructor arguments
+Language extensions:
+DataKinds, TypeOperators, PolyKinds, GADTs.
+
+Example 1: Vec - indexed type advantage since total function
+
+Fails for replicate without work \cite{DependentHaskell}
+
+Advantage over ADTs: type refinement by constructor
+
+Justification of base type \textit{extension work??: string/integer type}
+Example 2: IsElem - value as proof
+Example 3: Expr - all values well typed by construction
+
+Difference between [] and '[] (kinds vs types) in terms of levels
+
+Input/Ouput type as pre-condition/post-condition (eg empty context)

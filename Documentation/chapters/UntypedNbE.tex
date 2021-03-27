@@ -1,0 +1,36 @@
+\chapter{Normalising the Untyped Lambda Calculus}
+\label{chap:untypednbe}
+
+\subsection{Syntax}
+\begin{align}
+    N_f &:= N_e \mid \lambda.N_f  \\
+    N_e &:= N_e N_f \mid n
+\end{align}
+\cite{slides}
+
+\subsection{Semantics}
+Interpreted by the set V \cite{slides}
+$$
+    V := N_e \mid V \rightarrow V
+$$
+
+Problem: fresh variables
+
+\subsection{Fresh variables solution 1 - Gensym}
+approach based on \cite{slides}
+
+Implemented with State monad
+
+Issue with solution 1: Have to add monad everywhere (inescapable) - all functions dependent on state
+
+"Less functional" - carry around state (may as well use imperative)
+
+\subsection{Fresh variables solution 2 - Locally nameless terms}
+approach based on \cite{deBruijn}
+
+Uses de Bruijn Indicies for syntax and deBruijn levels for semantics
+
+index n references nth abstraction,
+if m abstractions: if n < m bound variables, otherwise free variable
+
+Shifting for abstractions
