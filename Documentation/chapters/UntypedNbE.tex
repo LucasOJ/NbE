@@ -1,20 +1,48 @@
 \chapter{Normalising the Untyped Lambda Calculus}
 \label{chap:untypednbe}
 
-\subsection{Syntax}
-\begin{align}
-    N_f &:= N_e \mid \lambda.N_f  \\
-    N_e &:= N_e N_f \mid n
-\end{align}
-\cite{slides}
+\section{Syntax}
 
-\subsection{Semantics}
+\begin{lstlisting}
+    type Name = String
+
+    data Expr = ExpVar Name
+              | ExpLam Name Expr
+              | ExpApp Expr Expr
+\end{lstlisting}
+
+Inhabitants of the inductively-defined datatype \lstinline{Expr} are well-formed terms of the untyped lambda calculus with strings as variables. The first argument of the lambda case introduces a new variable name bound in the function body defined by the second argument. For example, the identity function $\lambda x . x$ would be encoded as \lstinline{ExpLam "x" (ExpVar "x")}. The set of terms defined by \lstinline{Expr} is the domain of the normalisation function.
+
+\begin{lstlisting}
+    data NormalForm = NfNeutralForm NeutralForm
+                    | NfLam Name NormalForm
+
+    data NeutralForm = NeVar Name
+                     | NeApp NeutralForm NormalForm
+\end{lstlisting}
+
+We now define the target syntax \lstinline{NormalForm}; the codomain of the normalisation function. Note that \lstinline{NormalForm} is inhabited by all the terms not containing $\beta$-redexes \cite{slides}, since the definition of \lstinline{NeApp} only permits the application of non-lambda terms, which are encoded as values of type \lstinline{NeutralForm}.
+
+%% Haskell useful - clean structully inductive defn even when mutualy-recursive
+
+\section{Semantics}
 Interpreted by the set V \cite{slides}
-$$
-    V := N_e \mid V \rightarrow V
-$$
+\begin{lstlisting}
+    data V = Neutral NeutralV
+           | Function (V -> V)
 
+    data NeutralV = NeVVar Int
+                  | NeVApp NeutralV V
+\end{lstlisting}
+
+Could use Neutral Form but we establish our own datatype
 Problem: fresh variables
+
+\section{Evaluation}
+To evaluate terms (values of type \lstinline{Expr}), we need to keep track of which variables
+
+
+\section{Gensym Reification}
 
 \subsection{Fresh variables solution 1 - Gensym}
 approach based on \cite{slides}
@@ -24,7 +52,7 @@ Implemented with State monad
 Issue with solution 1: Have to add monad everywhere (inescapable) - all functions dependent on state
 
 "Less functional" - carry around state (may as well use imperative)
-
+\section{de Bruijn Reification}
 \subsection{Fresh variables solution 2 - Locally nameless terms}
 approach based on \cite{deBruijn}
 
