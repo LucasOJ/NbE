@@ -6,17 +6,12 @@ import Data.Map ( empty,  insert, Map, mapKeys, lookup )
 import Control.Monad.State ( MonadState(get), State, modify, evalState )
 import Data.Set ( Set, singleton, delete, union, notMember )
 
-type Name = Int
+import Untyped.Utils (getFreeVariables, getFreshVariableStream)
+import Untyped.TypeDeclarations (Name, Expr(..)) 
 
 -- State monad for generating fresh variable names
 -- Fresh variables represented as a stream of variable names
 type FreshName = State [Name]
-
--- Syntax
-data Expr = ExpVar Name
-          | ExpLam Name Expr
-          | ExpApp Expr Expr
-    deriving (Read, Show)
 
 -- Expressions with no reductions
 data NormalForm = NfNeutralForm NeutralForm
@@ -32,21 +27,11 @@ data NeutralForm = NeVar Name
 data V = Neutral NeutralV
        | Function (V -> V)
 
-data NeutralV = NeVVar Int
+data NeutralV = NeVVar Name
               | NeVApp NeutralV V
 
 -- Environment
 type Env = Map Name V
-
--- Evaluates the set of free variables given an expression
-freeVariables :: Expr -> Set Name
-freeVariables (ExpVar x) = singleton x
-freeVariables (ExpLam x m) = delete x (freeVariables m)
-freeVariables (ExpApp m n) = freeVariables m `union` freeVariables n
-
--- Lazily produces a stream of fresh names for an expression given its free variables
-freshNameStream :: Set Name -> [Name]
-freshNameStream freeVariables = [x | x <- [0..], notMember x freeVariables]
 
 -- Core NbE
 
@@ -109,7 +94,7 @@ normalise exp = normalToExpr $ evalState (reify semantics) freshNames where
     semantics = eval exp empty
 
     -- Generates the fresh name stream for exp
-    freshNames = (freshNameStream . freeVariables) exp
+    freshNames = (getFreshVariableStream . getFreeVariables) exp
 
 --- Display
 
@@ -126,13 +111,13 @@ neutralToExp (NeApp n m) = ExpApp (neutralToExp n) (normalToExpr m)
 --- Combinators
 
 identity :: Expr
-identity = ExpLam 0 (ExpVar 0)
+identity = ExpLam "x" (ExpVar "x")
+
+k :: Expr
+k = ExpLam "x" (ExpLam "y" (ExpVar "x"))
 
 k1 :: Expr
-k1 = ExpLam 0 (ExpLam 1 (ExpVar 0))
-
-k2 :: Expr
-k2 = ExpLam 0 (ExpLam 1 (ExpVar 1))
+k1 = ExpLam "x" (ExpLam "y" (ExpVar "y"))
 
 omega :: Expr
-omega = ExpApp (ExpLam 0 (ExpApp (ExpVar 0) (ExpVar 0))) (ExpLam 0 (ExpApp (ExpVar 0) (ExpVar 0)))
+omega = ExpApp (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x"))) (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x")))
