@@ -88,13 +88,14 @@ reifyNeutral (NeVApp n m) = do
 
 -- 'reify' reifies the semantic form into its canonical normal form
 -- 'evalState' returns the normal form of exp at the initial state (the stream of initially fresh variables for exp) 
-normalise :: Expr -> Expr
-normalise exp = normalToExpr $ evalState (reify semantics) freshNames where
-    -- evaluates the expression using the empty context into a semantic form shared by all beta-equivalent terms 
-    semantics = eval exp empty
+normalise :: Expr -> NormalForm
+normalise exp = evalState (reify (eval exp empty)) freshNames 
+    where
+        -- Generates the fresh name stream for exp
+        freshNames = (getFreshVariableStream . getFreeVariables) exp
 
-    -- Generates the fresh name stream for exp
-    freshNames = (getFreshVariableStream . getFreeVariables) exp
+normaliseToExpr :: Expr -> Expr
+normaliseToExpr = normalToExpr . normalise
 
 --- Display
 

@@ -26,12 +26,14 @@ We now define the target syntax \lstinline{NormalForm}; the codomain of the norm
 %% Haskell useful - clean structully inductive defn even when mutualy-recursive
 
 \section{Semantics}
-Interpreted by the set V \cite{slides}
+
+The first step of NbE is evaluating a syntactic term into a semantic set \lstinline{V}, where all $\beta$-equal terms evaluate to the same element of the semantic set. [CITE]
+
 \begin{lstlisting}
     data V = Neutral NeutralV
            | Function (V -> V)
 
-    data NeutralV = NeVVar Int
+    data NeutralV = NeVVar Name
                   | NeVApp NeutralV V
 \end{lstlisting}
 
@@ -39,8 +41,71 @@ Could use Neutral Form but we establish our own datatype
 Problem: fresh variables
 
 \section{Evaluation}
-To evaluate terms (values of type \lstinline{Expr}), we need to keep track of which variables
+To keep track of which variables have been bound by lambda terms, we introduce an environment to evaluate terms in.
 
+\begin{lstlisting}
+    type Env = Map Name V
+\end{lstlisting}
+
+Each key of the map corresponds to a bound variable name, and its associated value is the element of the semantic set representing the variable. 
+
+\begin{lstlisting}
+    eval :: Expr -> Env -> V
+    eval (ExpVar x) env = case lookup x env of
+            Just y -> y
+            Nothing -> Neutral (NeVVar x)
+
+    eval (ExpLam var m) env = Function f where
+        f v = eval m env' where
+            env' = insert var v env
+
+    eval (ExpApp m n) env = app (eval m env) (eval n env)
+\end{lstlisting}
+
+The evaluation function takes an expression and the environment to evaluate it in, and returns the interpretation in the semantic set. 
+
+In the variable case, we lookup the variable in the environment. If the variable was bound by an outer lambda term [WHAT IS AN OUTER LAMBDA TERM?], the variable will be present in the environment, and we can return the semantic value associated with it. Otherwise, the variables is free, so we return a semantic variable of the same name.
+
+The semantic interpretation of a lambda expression is a Haskell function of type \lstinline{V} $\rightarrow$ \lstinline{V}. This function takes an element of the semantic set \lstinline{V}, and returns the body of the lambda evaluated in an extended environment \lstinline{env'}. In this modified environment, we introduce the variable \lstinline{var} bound by the lambda, and map this variable to . This construction is chosen as applying \lstinline{f} to an argument $v_0$ has the effect of substituting $v_0$ in place of the variable \lstinline{var} in the body of the lambda. This is similar to contracting a redex, however in NbE application of semantic elements replaces syntactic substitution.
+
+\begin{lstlisting}
+    app :: V -> V -> V
+    app (Function f) v = f v
+    app (Neutral n)  v = Neutral (NeVApp n v)
+\end{lstlisting}
+
+
+\begin{lstlisting}
+    reify :: V -> FreshName NormalForm
+    reify (Neutral n)  = do 
+        reifiedN <- reifyNeutral n
+        return (NfNeutralForm reifiedN)
+    reify (Function f) = do
+        freshNames <- get
+        -- Remove the first name from the freshNames stream
+        let freshVar = head freshNames
+        -- The first name is no longer fresh (we are abount to use it as a bound variable)
+        -- Modify the state to remove the used variable name
+        modify tail
+        -- Reify the body of the semantic function when evaluated at the fresh bound variable
+        normalForm <- reify (f (Neutral (NeVVar freshVar)))
+        return (NfLam freshVar normalForm)
+
+    reifyNeutral :: NeutralV -> FreshName NeutralForm
+    reifyNeutral (NeVVar i)   = return (NeVar i)
+    reifyNeutral (NeVApp n m) = do
+        reifiedNeutral <- reifyNeutral n
+        reifiedNormal  <- reify m
+        return (NeApp reifiedNeutral reifiedNormal)
+\end{lstlisting}
+
+
+\begin{lstlisting}
+    normalise :: Expr -> NormalForm
+    normalise exp = evalState (reify (eval exp empty)) freshNames 
+        where
+            freshNames = (getFreshVariableStream . getFreeVariables) exp
+\end{lstlisting}
 
 \section{Gensym Reification}
 
