@@ -48,6 +48,7 @@ deBruijnExprToExpr context (freshVar:freshVarStream') (DbLam m)   =
         -- However in this case the keys and values have swapped since we are considering the bijection in the other direction
         context' = Map.insert 0 freshVar (Map.mapKeys (+1) context)
 -- It is ok to "split" freshVarStream here as the bound variables of each subterm are indepdendent 
+        -- ONLY FOR NORMAL TERMS!
 deBruijnExprToExpr context freshVarStream             (DbApp m n) = 
         ExpApp (deBruijnExprToExpr context freshVarStream m) (deBruijnExprToExpr context freshVarStream n)
 

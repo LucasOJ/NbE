@@ -86,6 +86,30 @@ reifyNeutral (NeVApp n m) = do
     reifiedNormal  <- reify m
     return (NeApp reifiedNeutral reifiedNormal) 
 
+reify' :: V -> [Name] -> NormalForm
+reify' (Neutral n)  freshVars = NfNeutralForm (reifyNeutral' n freshVars)
+reify' (Function f) (v0:vs)   = NfLam v0 body
+    where 
+        body = reify' (f (Neutral (NeVVar v0))) vs
+    
+-- Converts a sematic representation of a neutral form into its associated semantic form
+reifyNeutral' :: NeutralV -> [Name] -> NeutralForm
+reifyNeutral' (NeVVar i)   freshVars = NeVar i
+reifyNeutral' (NeVApp n m) freshVars = NeApp reifiedN reifiedM
+    where
+        reifiedN = reifyNeutral' n freshVars
+        reifiedM = reify' m freshVars
+    
+
+normalise' :: Expr -> NormalForm
+normalise' exp = reify' (eval exp empty) freshNames
+    where
+        -- Generates the fresh name stream for exp
+        freshNames = (getFreshVariableStream . getFreeVariables) exp
+
+normaliseToExpr' :: Expr -> Expr
+normaliseToExpr' = normalToExpr . normalise'
+
 -- 'reify' reifies the semantic form into its canonical normal form
 -- 'evalState' returns the normal form of exp at the initial state (the stream of initially fresh variables for exp) 
 normalise :: Expr -> NormalForm
