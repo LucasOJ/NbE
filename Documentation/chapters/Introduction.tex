@@ -11,7 +11,7 @@ NbE proceeds by interpreting each term as an element of a semantic set, where co
 
 % Why do we care
     % Modern
-NbE is a modern alternative to normalisation by reduction; a technique based on syntactic rewriting. Since the foundations of NbE are mathematical, we can prove that our implementation is correct and study its behaviour formally. [CITE]. Proving that the implementations are fully correct is beyond the scope of this project, but we do use types as machine-checked proof that our implementation satisfies certain correctness properties.
+NbE is a modern alternative to normalisation by reduction; a technique based on syntactic rewriting. Since the foundations of NbE are mathematical, we can prove that our implementation is correct and study its behaviour formally. [CITE]. Proving that the implementations are fully correct is beyond the scope of this project, but we use types as machine-checked proof that our implementation satisfies certain properties.
 % TODO: Make these points flow 
     % Dependent type theories (only namecheck)
 Dependent type theories [NAMECHECK] use NbE to check for equality between dependent types by normalising type-level programs.
@@ -23,7 +23,7 @@ NbE can improve the speed of compilation of functional languages. \cite{efficien
 % --roadmap
 % What do we do in the project
 % TODO: Justification of untyped, necessary to become familiar with NbE
-First we present two approaches for NbE of the untyped lambda calculus. The first implementation generates fresh variables during reification, which introduces global state into the program. State can be difficult to reason about and introduces complexity when testing, so often leads to errors in programs. These issues motivate a second implementation of NbE which uses de Bruijn indices and levels to represent variable binding in terms instead of named lambda terms, eliminating the need for fresh variable generation and state. We present a simple method for translating between named-variable terms and de Bruijn terms, since named-variable terms are easier to read. 
+First we present two approaches for NbE of the untyped lambda calculus. The first implementation generates fresh variables during reification, which introduces state into the program. State can be difficult to reason about and introduces complexity when testing, so often leads to errors in programs. These issues motivate a second implementation of NbE which uses de Bruijn indices and levels to represent variable binding in terms instead of named lambda terms, eliminating the need for fresh variable generation and state. We present a simple method for translating between named-variable terms and de Bruijn terms, since named-variable terms are easier to read. 
 
 Next we explore NbE for the simply typed lambda calculus by porting an implementation written in Agda to Haskell, utilising cutting edge features available through compiler extensions. GADTs are used in conjunction with the DataKinds and PolyKinds extensions to define terms that are well-typed by construction. For the implementation of the normalisation function itself we need the RankNTypes extension, which gives finer control over quantification in polymorphic type signatures, and ScopedTypeVariables, to bind type variables within function bodies. To emulate reflection of dependent types from the type level to the value level at runtime we explore the singleton pattern.
 

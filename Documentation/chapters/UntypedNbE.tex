@@ -15,7 +15,7 @@ NbE proceeds in two steps. The first is to evaluate terms in the lambda calculus
 % property of eval
 \ref{fig:nbeOverview} illustrates why NbE works. The key property of the \code{eval} function is that $\beta$-equal terms (represented by dots of the same colour in the syntax set) evaluate to the same semantic value. This ensures that $\beta$-equal terms normalise to the same normal form. The key property of the \code{reify} function is that the codomain of \code{reify} is the subset of normal forms, so \code{normalise} is guaranteed to return a normal form. 
 
-The remainer of this chapter defines the data NbE operates on and functions to perform NbE in Haskell.
+The remainder of this chapter defines the data NbE operates on and functions to perform NbE in Haskell.
 
 \section{Syntax}
 
@@ -96,9 +96,6 @@ The semantic interpretation of a lambda expression is a Haskell function of type
 
 From the variable case, we see that whenever the variable \code{ExpVar var} is evaluated in the function body it will be interpreted as \code{v}. We can think of \code{v} as a semantic placeholder for the value \code{f} is applied to (if any). The use of this approach is demonstrated in the application case.
 
-% TODO: Include in discussion of app instead?
-This construction is chosen as applying \code{f} to an argument $v_0$ has the effect of substituting $v_0$ in place of the variable \code{var} in the body of the lambda. This is similar to contracting a redex, however in NbE application of semantic elements replaces syntactic substitution.
-
 \begin{lstlisting}
     eval (ExpApp m n) env = app (eval m env) (eval n env)
 
@@ -109,8 +106,20 @@ This construction is chosen as applying \code{f} to an argument $v_0$ has the ef
 
 In the application case we evaluate the \code{m} and \code{n} terms in the same environment, before applying them to the \code{app} function, which handles the application of semantic values. 
 
-% Application always defined at semantic level
-% Contrast with term rewriting
+In the case where the first value is a function \code{f}, we evaluate \code{f} at the second argument \code{v0}. From the lambda case we see that this subcase corresponds to evaluating a redex term. Instead of contracting the redex by substituting at the syntactic level, we evaluate it using function application at the semantic level. The application instantiates the placeholder \code{v} at the semantic value \code{v0} in the lambda body. 
+
+% TODO: Explain more
+In the case that the first value is a value \code{n} of type \code{NeutralV}, there is no redex to contract, so we return a placeholder Neutral application at the semantic level.
+
+\section{Gensym Reification}
+
+Reification proceeds by pattern matching on the semantic value. 
+
+Since evaluating a lambda yields a function, reifying a function should yield a lambda to ensure that \code{normalise} preserves terms already in normal form. This introduces a question: what variable should the returned lambda term bind? The new bound variable should be different to all other bound variables in scope, otherwise \code{reify} could produce invalid terms. It should also be different to all other free variables in the original term, to prevent free variable capture. Since terms are considered equal up to bound variable renaming by $\alpha$-equivalence, we can choose any variable name that satisfies these requirements. 
+
+\begin{lstlisting}
+    type FreshName = State [Name]
+\end{lstlisting}
 
 \begin{lstlisting}
     reify :: V -> FreshName NormalForm
@@ -143,8 +152,6 @@ In the application case we evaluate the \code{m} and \code{n} terms in the same 
         where
             freshNames = (getFreshVariableStream . getFreeVariables) exp
 \end{lstlisting}
-
-\section{Gensym Reification}
 
 \subsection{Fresh variables solution 1 - Gensym}
 approach based on \cite{slides}
