@@ -1,6 +1,22 @@
 \chapter{Normalising the Untyped Lambda Calculus}
 \label{chap:untypednbe}
 
+\section{Overview of the NbE algorithm}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth]{./images/nbe_diagram}
+    \caption{A visual overview of the NbE algorithm from \cite{slides}}
+    \label{fig:nbeOverview}
+\end{figure}
+
+NbE proceeds in two steps. The first is to evaluate terms in the lambda calculus into a semantic set. In \ref{fig:nbeOverview} terms are represented by dots in the syntax set and the evaluation function is denoted by $\llbracket - \rrbracket$, which we refer to as \lstinline{eval}. The second step is to \lstinline{reify} the semantic value back into the normal form of the original term. Thus, the \lstinline{normalise} function which maps terms to their normal forms is the composition of \lstinline{eval} and \lstinline{reify}
+
+% property of eval
+\ref{fig:nbeOverview} illustrates why NbE works. The key property of the \lstinline{eval} function is that $\beta$-equal terms (represented by dots of the same colour in the syntax set) evaluate to the same semantic value. This ensures that $\beta$-equal terms normalise to the same normal form. The key property of the \lstinline{reify} function is that the codomain of \lstinline{reify} is the subset of normal forms, so \lstinline{normalise} is guaranteed to return a normal form. 
+
+The remainer of this chapter defines the data NbE operates on and functions to perform NbE in Haskell.
+
 \section{Syntax}
 
 \begin{lstlisting}
@@ -11,7 +27,7 @@
               | ExpApp Expr Expr
 \end{lstlisting}
 
-Inhabitants of the inductively-defined datatype \lstinline{Expr} are well-formed terms of the untyped lambda calculus with strings as variables. The first argument of the lambda case introduces a new variable name bound in the function body defined by the second argument. For example, the identity function $\lambda x . x$ would be encoded as \lstinline{ExpLam "x" (ExpVar "x")}. The set of terms defined by \lstinline{Expr} is the domain of the normalisation function.
+Inhabitants of the inductively-defined datatype \lstinline{Expr} are well-formed terms of the untyped lambda calculus with strings as variables. The first argument of the lambda case introduces a new variable name bound in the function body defined by the second argument. For example, the identity function $\lambda x . x$ would be encoded as \lstinline{ExpLam "x" (ExpVar "x")}.
 
 \begin{lstlisting}
     data NormalForm = NfNeutralForm NeutralForm
@@ -21,13 +37,9 @@ Inhabitants of the inductively-defined datatype \lstinline{Expr} are well-formed
                      | NeApp NeutralForm NormalForm
 \end{lstlisting}
 
-We now define the target syntax \lstinline{NormalForm}; the codomain of the normalisation function. Note that \lstinline{NormalForm} is inhabited by all the terms not containing $\beta$-redexes \cite{slides}, since the definition of \lstinline{NeApp} only permits the application of non-lambda terms, which are encoded as values of type \lstinline{NeutralForm}.
-
-%% Haskell useful - clean structully inductive defn even when mutualy-recursive
+We now define the target syntax of the \lstinline{normalise} function, \lstinline{NormalForm}. Note that \lstinline{NormalForm} is inhabited by all the terms not containing $\beta$-redexes \cite{slides}, since the definition of \lstinline{NeApp} only permits application on non-lambda terms, which are encoded as values of type \lstinline{NeutralForm}.
 
 \section{Semantics}
-
-The first step of NbE is evaluating a syntactic term into a semantic set \lstinline{V}, where all $\beta$-equal terms evaluate to the same element of the semantic set. [CITE]
 
 \begin{lstlisting}
     data V = Neutral NeutralV
@@ -37,8 +49,12 @@ The first step of NbE is evaluating a syntactic term into a semantic set \lstinl
                   | NeVApp NeutralV V
 \end{lstlisting}
 
-Could use Neutral Form but we establish our own datatype
-Problem: fresh variables
+% Can define V -> V in Haskell, harder in other languages, motivating advantage of Haskell?
+
+The semantic set has a very similar structure to the set of normal forms, however lambda terms are replaced with Haskell functions of type \lstinline{V} $\rightarrow$ \lstinline{V}. The similarity simplifies \lstinline{reify} as for some terms there are obvious translations from semantics to syntax. The replacement of lambda terms will be useful in evaluating $\beta$-redexes at the semantic level instead of the syntactic level.
+
+% Could use Neutral Form but we establish our own datatype
+% Problem: fresh variables
 
 \section{Evaluation}
 To keep track of which variables have been bound by lambda terms, we introduce an environment to evaluate terms in.
