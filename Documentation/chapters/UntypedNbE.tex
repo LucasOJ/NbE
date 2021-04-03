@@ -10,10 +10,10 @@
     \label{fig:nbeOverview}
 \end{figure}
 
-NbE proceeds in two steps. The first is to evaluate terms in the lambda calculus into a semantic set. In \ref{fig:nbeOverview} terms are represented by dots in the syntax set and the evaluation function is denoted by $\llbracket - \rrbracket$, which we refer to as \lstinline{eval}. The second step is to \lstinline{reify} the semantic value back into the normal form of the original term. Thus, the \lstinline{normalise} function which maps terms to their normal forms is the composition of \lstinline{eval} and \lstinline{reify}
+NbE proceeds in two steps. The first is to evaluate terms in the lambda calculus into a semantic set. In \ref{fig:nbeOverview} terms are represented by dots in the syntax set and the evaluation function is denoted by $\llbracket - \rrbracket$, which we refer to as \code{eval}. The second step is to \code{reify} the semantic value back into the normal form of the original term. Thus, the \code{normalise} function which maps terms to their normal forms is the composition of \code{eval} and \code{reify}
 
 % property of eval
-\ref{fig:nbeOverview} illustrates why NbE works. The key property of the \lstinline{eval} function is that $\beta$-equal terms (represented by dots of the same colour in the syntax set) evaluate to the same semantic value. This ensures that $\beta$-equal terms normalise to the same normal form. The key property of the \lstinline{reify} function is that the codomain of \lstinline{reify} is the subset of normal forms, so \lstinline{normalise} is guaranteed to return a normal form. 
+\ref{fig:nbeOverview} illustrates why NbE works. The key property of the \code{eval} function is that $\beta$-equal terms (represented by dots of the same colour in the syntax set) evaluate to the same semantic value. This ensures that $\beta$-equal terms normalise to the same normal form. The key property of the \code{reify} function is that the codomain of \code{reify} is the subset of normal forms, so \code{normalise} is guaranteed to return a normal form. 
 
 The remainer of this chapter defines the data NbE operates on and functions to perform NbE in Haskell.
 
@@ -27,7 +27,7 @@ The remainer of this chapter defines the data NbE operates on and functions to p
               | ExpApp Expr Expr
 \end{lstlisting}
 
-Inhabitants of the inductively-defined datatype \lstinline{Expr} are well-formed terms of the untyped lambda calculus with strings as variables. The first argument of the lambda case introduces a new variable name bound in the function body defined by the second argument. For example, the identity function $\lambda x . x$ would be encoded as \lstinline{ExpLam "x" (ExpVar "x")}.
+Inhabitants of the inductively-defined datatype \code{Expr} are well-formed terms of the untyped lambda calculus with strings as variables. The first argument of the lambda case introduces a new variable name bound in the function body defined by the second argument. For example, the identity function $\lambda x . x$ would be encoded as \code{ExpLam "x" (ExpVar "x")}.
 
 \begin{lstlisting}
     data NormalForm = NfNeutralForm NeutralForm
@@ -37,7 +37,7 @@ Inhabitants of the inductively-defined datatype \lstinline{Expr} are well-formed
                      | NeApp NeutralForm NormalForm
 \end{lstlisting}
 
-We now define the target syntax of the \lstinline{normalise} function, \lstinline{NormalForm}. Note that \lstinline{NormalForm} is inhabited by all the terms not containing $\beta$-redexes \cite{slides}, since the definition of \lstinline{NeApp} only permits application on non-lambda terms, which are encoded as values of type \lstinline{NeutralForm}.
+We now define the target syntax of the \code{normalise} function, \code{NormalForm}. Note that \code{NormalForm} is inhabited by all the terms not containing $\beta$-redexes \cite{slides}, since the definition of \code{NeApp} only permits application on non-lambda terms, which are encoded as values of type \code{NeutralForm}.
 
 \section{Semantics}
 
@@ -49,47 +49,68 @@ We now define the target syntax of the \lstinline{normalise} function, \lstinlin
                   | NeVApp NeutralV V
 \end{lstlisting}
 
-% Can define V -> V in Haskell, harder in other languages, motivating advantage of Haskell?
+% TODO: Mentional easy to define V -> V in Haskell, harder in other languages, motivating advantage of Haskell?
 
-The semantic set has a very similar structure to the set of normal forms, however lambda terms are replaced with Haskell functions of type \lstinline{V} $\rightarrow$ \lstinline{V}. The similarity simplifies \lstinline{reify} as for some terms there are obvious translations from semantics to syntax. The replacement of lambda terms will be useful in evaluating $\beta$-redexes at the semantic level instead of the syntactic level.
+The semantic set \code{V} has a very similar structure to the set of normal forms, however lambda terms are replaced with Haskell functions of type \code{V} $\rightarrow$ \code{V}.
+% TODO: Include following paragraph or not - not justified? 
+The similarity simplifies \code{reify} as for some terms there are obvious translations from semantics to syntax. The replacement of lambda terms will be useful in evaluating $\beta$-redexes at the semantic level instead of the syntactic level. 
 
-% Could use Neutral Form but we establish our own datatype
-% Problem: fresh variables
+% TODO: Discuss using why don't use Neutral Form but establish our own datatype
 
 \section{Evaluation}
-To keep track of which variables have been bound by lambda terms, we introduce an environment to evaluate terms in.
+
+Evaluation proceeds by pattern matching on the given term, and evaluating its constituent subterms. However, the semantic meaning of subterms can differ depending on which variables are bound by which lambda term. For example, in the terms $\lambda x . \lambda y . xy$ and $\lambda y . xy$, the semantic meaning of the $xy$ subterm is different. Thus, in addition to the term itself, \code{eval} needs information about the bound variables introduced by surrounding lambda terms. 
+
+To keep track of which variables have been bound by surrounding lambda terms, we construct an environment datatype.
 
 \begin{lstlisting}
     type Env = Map Name V
 \end{lstlisting}
 
-Each key of the map corresponds to a bound variable name, and its associated value is the element of the semantic set representing the variable. 
+Each key of the map corresponds to a bound variable name, and its associated value is the semantic value representing the variable. The environment can be thought of as the scope each subterm is evaluated in. 
+% TODO: Include or not - helpful or overly general waffle?
+It expands as more variables are bound in deeper subterms.
 
 \begin{lstlisting}
     eval :: Expr -> Env -> V
-    eval (ExpVar x) env = case lookup x env of
-            Just y -> y
-            Nothing -> Neutral (NeVVar x)
+\end{lstlisting}
 
+\code{eval} takes an expression and the environment to evaluate it in, pattern matches on the expression, and returns the interpretation of the term in the semantic set. We now discuss the implementation of each case of the pattern match.
+
+\begin{lstlisting}
+    eval (ExpVar x) env = case lookup x env of
+        Just y -> y
+        Nothing -> Neutral (NeVVar x)
+\end{lstlisting}
+
+In the variable case, we lookup the variable in the environment. If the variable was bound by a surrounding lambda term, the variable will be present in the environment, and we can return the semantic value associated with it. Otherwise, the variables is free, so we return a semantic variable with the same name.
+
+\begin{lstlisting}
     eval (ExpLam var m) env = Function f where
         f v = eval m env' where
             env' = insert var v env
-
-    eval (ExpApp m n) env = app (eval m env) (eval n env)
 \end{lstlisting}
 
-The evaluation function takes an expression and the environment to evaluate it in, and returns the interpretation in the semantic set. 
+% TODO: Include or not, repeating code in words?
+The semantic interpretation of a lambda expression is a Haskell function of type \code{V} $\rightarrow$ \code{V}. This function takes an element \code{v} of the semantic set \code{V}, and returns the body of the lambda evaluated in an extended environment \code{env'}. In this extended environment, we bind the named variable \code{var} to \code{v}.
 
-In the variable case, we lookup the variable in the environment. If the variable was bound by an outer lambda term [WHAT IS AN OUTER LAMBDA TERM?], the variable will be present in the environment, and we can return the semantic value associated with it. Otherwise, the variables is free, so we return a semantic variable of the same name.
+From the variable case, we see that whenever the variable \code{ExpVar var} is evaluated in the function body it will be interpreted as \code{v}. We can think of \code{v} as a semantic placeholder for the value \code{f} is applied to (if any). The use of this approach is demonstrated in the application case.
 
-The semantic interpretation of a lambda expression is a Haskell function of type \lstinline{V} $\rightarrow$ \lstinline{V}. This function takes an element of the semantic set \lstinline{V}, and returns the body of the lambda evaluated in an extended environment \lstinline{env'}. In this modified environment, we introduce the variable \lstinline{var} bound by the lambda, and map this variable to . This construction is chosen as applying \lstinline{f} to an argument $v_0$ has the effect of substituting $v_0$ in place of the variable \lstinline{var} in the body of the lambda. This is similar to contracting a redex, however in NbE application of semantic elements replaces syntactic substitution.
+% TODO: Include in discussion of app instead?
+This construction is chosen as applying \code{f} to an argument $v_0$ has the effect of substituting $v_0$ in place of the variable \code{var} in the body of the lambda. This is similar to contracting a redex, however in NbE application of semantic elements replaces syntactic substitution.
 
 \begin{lstlisting}
+    eval (ExpApp m n) env = app (eval m env) (eval n env)
+
     app :: V -> V -> V
-    app (Function f) v = f v
-    app (Neutral n)  v = Neutral (NeVApp n v)
+    app (Function f) v0 = f v0
+    app (Neutral n)  v0 = Neutral (NeVApp n v0)
 \end{lstlisting}
 
+In the application case we evaluate the \code{m} and \code{n} terms in the same environment, before applying them to the \code{app} function, which handles the application of semantic values. 
+
+% Application always defined at semantic level
+% Contrast with term rewriting
 
 \begin{lstlisting}
     reify :: V -> FreshName NormalForm
