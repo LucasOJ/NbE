@@ -6,7 +6,7 @@ import Data.Tuple (swap)
 
 -- Evaluates the set of free variables given an expression
 getFreeVariables :: Expr -> Set Name
-getFreeVariables (ExpVar x) = singleton x
+getFreeVariables (ExpVar x)   = singleton x
 getFreeVariables (ExpLam x m) = delete x (getFreeVariables m)
 getFreeVariables (ExpApp m n) = getFreeVariables m `union` getFreeVariables n
 
@@ -23,7 +23,9 @@ invertMap = Map.fromList . map swap . Map.toList
 -- Produces a stream of fresh variables 
 -- All variable names in the stream don't collide with any free variables in the term to prevent variable capture
 getFreshVariableStream :: Set Name -> [Name]
-getFreshVariableStream freeVars = [freshVariable i | i <- [0..], notMember (freshVariable i) freeVars] where
+getFreshVariableStream freeVars = [freshVariable i | i <- [0..], 
+                                   notMember (freshVariable i) freeVars] 
+    where
         freshVariable i = "v" ++ show i
 
 -- Given the mapping of free variables to deBruijn indexes, produce the deBruijn respresentation of a term

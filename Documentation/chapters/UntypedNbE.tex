@@ -98,13 +98,13 @@ From the variable case, we see that whenever the variable \code{ExpVar var} is e
 
 \begin{lstlisting}
     eval (ExpApp m n) env = app (eval m env) (eval n env)
-
-    app :: V -> V -> V
-    app (Function f) v0 = f v0
-    app (Neutral n)  v0 = Neutral (NeVApp n v0)
+        where
+            app :: V -> V -> V
+            app (Function f) v0 = f v0
+            app (Neutral n)  v0 = Neutral (NeVApp n v0)
 \end{lstlisting}
 
-In the application case we evaluate the \code{m} and \code{n} terms in the same environment, before applying them to the \code{app} function, which handles the application of semantic values. 
+In the application case we evaluate the \code{m} and \code{n} terms in the same environment, before applying them to \code{app}, which handles the application of semantic values. 
 
 In the case where the first value is a function \code{f}, we evaluate \code{f} at the second argument \code{v0}. From the lambda case we see that this subcase corresponds to evaluating a redex term. Instead of contracting the redex by substituting at the syntactic level, we evaluate it using function application at the semantic level. The application instantiates the placeholder \code{v} at the semantic value \code{v0} in the lambda body. 
 
@@ -113,45 +113,82 @@ In the case that the first value is a value \code{n} of type \code{NeutralV}, th
 
 \section{Gensym Reification}
 
-Reification proceeds by pattern matching on the semantic value. 
+% TODO: Cite name, in de Bruijn paper
 
-Since evaluating a lambda yields a function, reifying a function should yield a lambda to ensure that \code{normalise} preserves terms already in normal form. This introduces a question: what variable should the returned lambda term bind? The new bound variable should be different to all other bound variables in scope, otherwise \code{reify} could produce invalid terms. It should also be different to all other free variables in the original term, to prevent free variable capture. Since terms are considered equal up to bound variable renaming by $\alpha$-equivalence, we can choose any variable name that satisfies these requirements. 
+Reification proceeds by pattern matching on the semantic value, and recursively reifying its constituent values.
+
+Since evaluating a lambda yields a function, reifying a function should yield a lambda to ensure that \code{normalise} preserves terms already in normal form. But what variable should the returned lambda term bind? The new bound variable should be different to all other bound variables in scope, otherwise \code{reify} could produce invalid terms. It should also be different to all other free variables in the original term, to prevent free variable capture. Since terms are considered equal up to bound variable renaming by $\alpha$-equivalence, we can choose any variable name that satisfies these requirements. 
+
+One approach to resolve this issue suggested by \cite{slides} is to generate a fresh variable name during reification whenever a new bound variable is needed. However, generating fresh variables during the execution of \code{reify} would require the function to track which variables have already been bound between calls to \code{reify}, which suggests the use of state. This could be modelled using the \code{State} monad, in which case \code{reify} would have the type signature \code{reify :: V -> State [Name] NormalForm}, where \code{[Name]} corresponds to a list of variable names that have already been bound. This would allow us to implicitly pass the list of bound variable names between calls to reify. However state introduces additional complexity and makes testing more difficult, which can lead to flawed implementations.
+
+%TODO: Needs to introduce state, could use State monad, too complex
+
+Instead, we opt for a more functional approach. Before the execution of \code{reify}, we generate a suitable stream of fresh variable names of type \code{[Name]}. By making \code{reify} a function of the semantic element and the stream of fresh variables, we can simply pop a fresh variable name from the stream whenever a new variable is bound. In recursive calls, \code{reify} only passes the tail of the stream to ensure bound variable names are never reused.
 
 \begin{lstlisting}
-    type FreshName = State [Name]
+    reify :: V -> [Name] -> NormalForm
 \end{lstlisting}
+
+\code{reify} proceeds by pattern matching on the first argument of type \code{V}. 
 
 \begin{lstlisting}
-    reify :: V -> FreshName NormalForm
-    reify (Neutral n)  = do 
-        reifiedN <- reifyNeutral n
-        return (NfNeutralForm reifiedN)
-    reify (Function f) = do
-        freshNames <- get
-        -- Remove the first name from the freshNames stream
-        let freshVar = head freshNames
-        -- The first name is no longer fresh (we are abount to use it as a bound variable)
-        -- Modify the state to remove the used variable name
-        modify tail
-        -- Reify the body of the semantic function when evaluated at the fresh bound variable
-        normalForm <- reify (f (Neutral (NeVVar freshVar)))
-        return (NfLam freshVar normalForm)
+    reify (Neutral n)  freshVars = NfNeutralForm (reifyNeutral n freshVars)
 
-    reifyNeutral :: NeutralV -> FreshName NeutralForm
-    reifyNeutral (NeVVar i)   = return (NeVar i)
-    reifyNeutral (NeVApp n m) = do
-        reifiedNeutral <- reifyNeutral n
-        reifiedNormal  <- reify m
-        return (NeApp reifiedNeutral reifiedNormal)
+    reifyNeutral :: NeutralV -> [Name] -> NeutralForm
+    reifyNeutral (NeVVar i)   freshVars = NeVar i
+    reifyNeutral (NeVApp n m) freshVars = NeApp reifiedN reifiedM
+        where
+            reifiedN = reifyNeutral n freshVars
+            reifiedM = reify m freshVars
 \end{lstlisting}
 
+In the neutral case, we use \code{reifyNeutral} to convert the value \code{n} of type \code{NeutralV} to a \code{NeutralForm}, which is promoted to a \code{NormalForm} by the \code{NfNeutralForm} constructor. The \code{reifyNeutral} function also proceeds by patten matching. 
+
+In the variable case we extract a neutral syntactic variable of the same name as the semantic variable. 
+
+In the application case we reify the semantic values \code{n} and \code{m}, and return a neutral syntactic application of the resulting terms.
+% TODO: Check this - talk about independece between reifyiedN and reifiedM, reword
+We are able to reify both semantic values using the same fresh variable stream since the returned value is a \code{NeutralForm}, which by definition contains no redexes. This means \code{reifiedM} will not be substituted into \code{reifiedN}, so there will not be any variable name clashes.
+For example, in the neutral term $(y(\lambda x.x))(\lambda x . x)$ there is no issue in the left and right terms reusing $x$ as a bound variable since there is no ambiguity about which $x$ is being referred to in any part of the term. Since there are no redexes to contract, there is no need to rename the bound variables.
+
+% TODO: Define 'original term', 'surrounding lambdas'
+
+\begin{lstlisting}
+    reify (Function f) (v:vs)   = NfLam v body
+    where 
+        body = reify (f (Neutral (NeVVar v))) vs
+\end{lstlisting}
+
+The reification of an abstract semantic function \code{f} produces a concrete syntactic description for \code{f}. \code{reify} abstracts out the argument of \code{f} into a syntactic variable \code{v} with a lambda expression. In the body of \code{f}, we replace the abstract argument with the variable \code{v} by applying \code{f} to \code{Neutral (NeVVar v)}. This value has type \code{V}, so we can \code{reify} it to produce a syntactic representation for the body of \code{f}, which completes the term. We \code{reify} the term with the stream of fresh variables \code{vs}, since the variable name \code{v} is bound in the body of the lambda, so is no longer fresh.
+
+Using the implementations of \code{eval} and \code{reify}, we can define the \code{normalise} function as follows.
 
 \begin{lstlisting}
     normalise :: Expr -> NormalForm
-    normalise exp = evalState (reify (eval exp empty)) freshNames 
+    normalise exp = reify (eval exp Map.empty) freshNames
         where
             freshNames = (getFreshVariableStream . getFreeVariables) exp
 \end{lstlisting}
+
+\code{normalise} takes an expression, and returns its normal form. Since \code{normalise} returns a value of type \code{NormalForm} it is guaranteed that the returned expression is normal. First we evaluate the given expression in the empty environment, since no variables are bound to begin with. Then we reify the returned semantic value of type \code{V} back into a concrete \code{NormalForm} term.
+
+We produce a stream of valid fresh variable names \code{freshVars} of type \code{[Name]} for the given expression using the following functions.
+
+\begin{lstlisting}
+    getFreeVariables :: Expr -> Set Name
+    getFreeVariables (ExpVar x)   = singleton x
+    getFreeVariables (ExpLam x m) = delete x (getFreeVariables m)
+    getFreeVariables (ExpApp m n) = getFreeVariables m `union` getFreeVariables n
+
+    getFreshVariableStream :: Set Name -> [Name]
+    getFreshVariableStream freeVars = [freshVariable i | i <- [0..], 
+                                       notMember (freshVariable i) freeVars] 
+        where
+            freshVariable i = "v" ++ show i
+\end{lstlisting}
+
+\code{getFreeVariables} takes an expression and returns the set of free variable names. \code{getFreshVariableStream} takes the set of free variable names and returns a stream of fresh variable names, since each of the names are distinct from each other and the free variables.
+
 
 \subsection{Fresh variables solution 1 - Gensym}
 approach based on \cite{slides}
@@ -171,3 +208,5 @@ index n references nth abstraction,
 if m abstractions: if n < m bound variables, otherwise free variable
 
 Shifting for abstractions
+
+% Omega never terminates, infinte redution/NbE
