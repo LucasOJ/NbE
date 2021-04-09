@@ -1,17 +1,29 @@
-\chapter{Representation of the Typed Lambda Calculus}
+\chapter{Representation of the Simply Typed Lambda Calculus}
 \label{chap:typedlamadacalculus}
 
-TypeOperators allows us to define types using infix operator :->.
-'infixr :-> 9' sets strongest right assoicativity (matches usual convention that a -> b -> c ~ a -> (b -> c))
+Before implementing NbE for the STLC, we define datatypes representing the typed lambda calculus in Haskell. 
 
-Problem: Only want to normalise well typed terms.
-Criteria: 
-(1) Exclude $\lambda x . y$ - y free variable so not in typing context
-(2) Exclude $\lambda x.xx$ - untypable (types are finite)
+\section{Types}
 
-Problem with standard terms - can't carry type information
+We first define a type syntax to represent the monotypes of the simply typed lambda calculus. 
 
-\subsection{Typed Term solution - GADTs}
+\begin{lstlisting}
+    data Ty = BaseTy | Ty :-> Ty 
+    infixr 9 :->
+\end{lstlisting}
+
+In this type syntax there is a single base type \code{BaseTy} and an infix type constructor \code{:->}, where the type \code{A :-> B} represents the function type from type \code{A} to type \code{B}. For this implementation of NbE, a single base type is sufficient to capture the structure of simple types. Multiple base types would have introduced unnecessary complexity.
+%TODO: Justify why, type checking?
+Normalising terms with polymorphic types is beyond the scope of this project.
+ 
+\code{infixr :-> 9} specifies that \code{:->} is right associative, so as per convention, the type \code{A :-> (B :-> C)} can instead be written \code{A :-> B :-> C}.
+
+\section{Typed terms}
+
+For typed NbE, we only normalise well-typed terms of the lambda calculus. Although well-typed terms are a subset of the untyped terms, the definition of untyped terms from Chapter \ref{chap:untypednbe} doesn't carry enough information to check that terms are well-typed. Instead, we define a richer definiton of typed terms that carry type information proposed by Richard Eisenberg \cite{GADTs}. This information will be stored in the Haskell type of each term value by utilising compiler extensions for GHC. 
+% Well-typed by contruction better for haskell than type checking 
+
+\subsection{GADTs}
 
 \cite{GADTs}
 Explicit type constructor arguments
