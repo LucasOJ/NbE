@@ -63,12 +63,12 @@ reify :: Int -> V -> NormalForm
 -- We increment by 1 since n represents the maximum number of free variables (we have introduced a new one)
 reify n (Function f) = NfLam (reify (n + 1) (f (Neutral (NeVLevel n))))
 reify n (Neutral m)  = NfNeutralForm (reifyNeutral n m)
-
--- Converts a sematic neutral into its associated sytactic neutral form
-reifyNeutral :: Int -> NeutralV -> NeutralForm
--- Converts a semantic deBruijn level into a sytactic deBruijn variable
-reifyNeutral n (NeVLevel k) = NeVar (n - 1 - k)
-reifyNeutral n (NeVApp p q) = NeApp (reifyNeutral n p) (reify n q)
+    where
+        -- Converts a sematic neutral into its associated sytactic neutral form
+        reifyNeutral :: Int -> NeutralV -> NeutralForm
+        -- Converts a semantic deBruijn level into a sytactic deBruijn variable
+        reifyNeutral n (NeVLevel k) = NeVar (n - 1 - k)
+        reifyNeutral n (NeVApp p q) = NeApp (reifyNeutral n p) (reify n q)
 
 ---- Conversion back to standard deBruijn term
 

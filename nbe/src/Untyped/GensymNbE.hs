@@ -89,16 +89,16 @@ reifyNeutral' (NeVApp n m) = do
 
 reify :: V -> [Name] -> NormalForm
 reify (Neutral n)  freshVars = NfNeutralForm (reifyNeutral n freshVars)
+    where 
+        reifyNeutral :: NeutralV -> [Name] -> NeutralForm
+        reifyNeutral (NeVVar i)   freshVars = NeVar i
+        reifyNeutral (NeVApp n m) freshVars = NeApp reifiedN reifiedM
+            where
+                reifiedN = reifyNeutral n freshVars
+                reifiedM = reify m freshVars
 reify (Function f) (v:vs)   = NfLam v body
     where 
         body = reify (f (Neutral (NeVVar v))) vs
-
-reifyNeutral :: NeutralV -> [Name] -> NeutralForm
-reifyNeutral (NeVVar i)   freshVars = NeVar i
-reifyNeutral (NeVApp n m) freshVars = NeApp reifiedN reifiedM
-    where
-        reifiedN = reifyNeutral n freshVars
-        reifiedM = reify m freshVars
     
 normalise :: Expr -> NormalForm
 normalise exp = reify (eval exp Map.empty) freshNames
