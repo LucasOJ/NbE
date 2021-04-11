@@ -20,10 +20,70 @@ Normalising terms with polymorphic types is beyond the scope of this project.
 
 \section{Typed terms}
 
-For typed NbE, we only normalise well-typed terms of the lambda calculus. Although well-typed terms are a subset of the untyped terms, the definition of untyped terms from Chapter \ref{chap:untypednbe} doesn't carry enough information to check that terms are well-typed. Instead, we define a richer definiton of typed terms that carry type information proposed by Richard Eisenberg \cite{GADTs}. This information will be stored in the Haskell type of each term value by utilising compiler extensions for GHC. 
+For typed NbE, we only normalise well-typed terms of the lambda calculus. Although well-typed terms are a subset of the untyped terms, the definition of untyped terms from Chapter \ref{chap:untypednbe} doesn't carry enough information to check that terms are well-typed. 
+% TODO: Review, not great angle as type more related than just information storage
+Instead, we define a richer definiton of typed terms that carry type information proposed by Richard Eisenberg \cite{GADTs}. This information will be stored in the Haskell type of each term value by utilising compiler extensions for GHC. 
 % Well-typed by contruction better for haskell than type checking 
 
-\subsection{GADTs}
+\subsection{Introduction to Generalised Algebraic Datatypes (GADTs)}
+
+GADTs are a generalisation of algebraic datatypes, where the type signature of each constructor is explicitly specified. The canonical example for the use of GADTs is length-indexed vectors, where the length of each vector is tracked in its type.
+
+To track the length of the vector in its type, we first need a way of representing numbers at the type-level. A standard way of representing the natural numbers at value-level is as follows:
+
+\begin{lstlisting}
+    data Nat = Zero | Succ Nat
+\end{lstlisting}
+
+We use the \code{DataKinds} compiler extension to automatically create a kind \code{Nat}, with the same structure as the original \code{Nat} datatype. Thus, the \code{Nat} kind has the inhabitants \code{'Zero} and \code{'Succ}, which are denoted as types with apostrophes to prevent ambiguity with their value-level counterparts. These inhabitants are type constructors, where \code{'Zero} has kind \code{Nat}, and \code{'SuccNat} has kind \code{Nat} $\rightarrow$ \code{Nat}. 
+
+\begin{figure}[h]
+    \centering
+    \begin{tabular}{ |c|c|c| } 
+        \hline
+        Level & Original ADT & Promoted Kind \\
+        \hline 
+        Kinds &  & Nat \\
+        Types & Nat & 'Zero, 'Succ \\
+        Values & Zero, Succ & \\
+        \hline
+    \end{tabular}
+    \caption{Illustration of the promoted kinds automatically created by \code{DataKinds}}
+    \label{fig:datakindsPromotion}
+\end{figure}
+
+We use the \code{'Zero} and \code{'Succ} type constructors to represent numbers at the type level. Using the \code{GADTs} extension we now define the datatype for length-indexed vectors using GADT syntax.
+
+\begin{lstlisting}
+    data Vec :: * -> Nat -> * where
+        ZeroVec :: Vec a 'Zero
+        SuccVec :: a -> Vec a n -> Vec a ('Succ n)
+\end{lstlisting}
+
+% TODO: PolyKinds vs KindSignatures
+
+A value of type \code{Vec a n} is a vector of n elements of type \code{a}. For this definition we also require the \code{KindSignatures} compiler extension to specify the kind signature of \code{Vec} in the first line of the definition. This specifies that the first type parameter of \code{Vec}, denoting the type of the elements of the vector, should be of kind \code{*}. This is because the type of the elements of the vector could be any concrete type, all of which are inhabitants of \code{*}. The first line also specifies that the second type parameter of \code{Vec}, denoting the length of the vector, should be a type of the promoted kind \code{Nat}, which we use to represent a type-level number. The returned kind \code{*} in the kind signature specifies that each vector has a concrete type of kind \code{*}.
+
+Since \code{Vec} is a GADT, the types of each constructor are given explicitly. The \code{ZeroVec} constructor creates a vector with elements of any type (since \code{a} is universally quantified over) of length \code{'Zero}. The \code{SuccVec} constructor takes a value of type \code{a} and a vector of \code{n} elements of type \code{a}, and returns a new vector of length \code{'Succ n}. For example, the vector \code{SuccVec "a" (SuccVec "b" ZeroVec)} has type \code{Vec String ('Succ ('Succ 'Zero))}.
+
+An immediate advantage of using GADT length-indexed vectors over standard lists is that we can define a new function \code{head'} which only operates on vectors containing at least one element. 
+
+\begin{lstlisting}
+    head' :: Vec a (Succ n) -> a
+    head' (SuccVec x xs) = x
+\end{lstlisting}
+
+The additional type precision awarded by GADTs moves errors from run-time to compile-time.
+
+% TODO: Additional precision with types resused many time in this project
+
+\subsection{The Elem GADT}
+
+Before using GADTs to construct the set of well-typed, we first define a useful GADT: \code{Elem}.
+
+A value of type \code{Elem x xs} is a proof that the value \code{x} is in the list \code{xs}. 
+
+% TODO: Need stronger kind sigantures, polykinds (implies datakinds and kindsignatures)
 
 \cite{GADTs}
 Explicit type constructor arguments
