@@ -4,29 +4,26 @@
 % TODO: STLC Abbreviation defininition
 % TODO: Why choose STLC? Just as powerful as Turing Machine, simple
 
-Before implementing NbE for the STLC, we define datatypes representing the typed lambda calculus in Haskell. 
+Before implementing NbE for the STLC, we define datatypes representing the STLC in Haskell. 
 
 \section{Types}
 
-We first define a type syntax to represent the monotypes of the simply typed lambda calculus. 
+We first define a type syntax \code{Ty} to represent the monotypes of the STLC. 
 
 \begin{lstlisting}
     data Ty = BaseTy | Ty :-> Ty 
     infixr 9 :->
 \end{lstlisting}
 
-In this type syntax there is a single base type \code{BaseTy} and an infix type constructor \code{:->}, where the type \code{A :-> B} represents the function type from type \code{A} to type \code{B}. For this implementation of NbE, a single base type is sufficient to capture the structure of simply typed terms. Multiple base types would have introduced unnecessary complexity.
+In this type syntax there is a single base type \code{BaseTy} and an infix type constructor \code{:->}, where the type \code{A :-> B} represents the function type from type \code{A} to type \code{B}. For the implementation of NbE in Chapter \ref{chap:typednbe}, a single base type is sufficient to capture the structure of simply typed terms. Multiple base types would have introduced unnecessary complexity.
 %TODO: Justify why, type checking?
 Normalising terms with polymorphic types is beyond the scope of this project.
  
 \code{infixr :-> 9} specifies that \code{:->} is right associative, so as per convention, the type \code{A :-> (B :-> C)} can instead be written \code{A :-> B :-> C}.
 
-\section{Typed Terms}
+\section{First Attempt at Typed Terms}
 
-For typed NbE, we only normalise well-typed terms of the lambda calculus. Although well-typed terms are a subset of the untyped terms, the definition of untyped terms from Chapter \ref{chap:untypednbe} doesn't carry enough information to check that terms are well-typed. 
-% TODO: Review, not great angle as type more related than just information storage
-Instead, we define a richer definiton of typed terms that carry type information proposed by Richard Eisenberg \cite{GADTs}. This information will be stored in the Haskell type of each term value by utilising compiler extensions for GHC. 
-% Well-typed by contruction better for haskell than type checking 
+For typed NbE, we only normalise well-typed terms of the lambda calculus. To ensure that our terms are well-typed, expressions should track the type of the term and its typing context. We consider the following implementation of typed expressions.
 
 \begin{lstlisting}
     data Expr = Var Ty [Ty] Int
@@ -34,11 +31,17 @@ Instead, we define a richer definiton of typed terms that carry type information
               | App Ty [Ty] Expr Expr
 \end{lstlisting}
 
-% TODO: Repeated parameter - property of Expr' rather than constructor
+This implementation uses the de Bruijn style explored in Chapter \ref{chap:untypednbe}, with an additional \code{Ty} parameter to store the type of the term, and a \code{[Ty]} parameter to store the typing context.
 
-\subsection{Introduction to Generalised Algebraic Datatypes (GADTs)}
+% TODO: Explain typing context with de Bruijn indicies here
 
-GADTs are a generalisation of algebraic datatypes, where the type signature of each constructor is explicitly specified. The canonical example for the use of GADTs is length-indexed vectors, where the length of each vector is tracked in its type.
+However, with this implementation it is possible to construct terms which are not well-typed such as \code{Var BaseTy [] 0}. This is because the set of representable terms is exactly the set of untyped terms, many of which are not well-typed. We could have a separate type-checking function to verify whether terms are well-typed before normalisation, but there would be no guarantee that the normalisation function produces well-typed terms.
+
+Instead, we opt for an approach where the only inhabitants of \code{Expr} are well-typed terms. This guarantees that terms are well-typed before and after normalisation, and removes the additional complexity of a type-checker. To implement a datatype of terms that are well-typed by construction, we need to do more than simply add the type and typing context of each term. We also need to restrict the construction of terms based on the typing judgement rules of the STLC. In Section \ref{sect:typedsyntax}, we present a method for specifying these type restrictions developed by Richard Eisenberg \cite{GADTs}, using GADTs.
+
+\section{Introduction to Generalised Algebraic Datatypes (GADTs)}
+
+GADTs are a generalisation of algebraic datatypes, where the type signature of each constructor is explicitly specified. The canonical example of a GADT is the length-indexed vector, where the length of each vector is tracked in its type.
 
 To track the length of the vector in its type, we first need a way of representing numbers at the type-level. A standard way of representing the natural numbers at value-level is as follows:
 
@@ -46,7 +49,7 @@ To track the length of the vector in its type, we first need a way of representi
     data Nat = Zero | Succ Nat
 \end{lstlisting}
 
-We use the \code{DataKinds} compiler extension to automatically create a kind \code{Nat}, with the same structure as the original \code{Nat} datatype. Thus, the \code{Nat} kind has the inhabitants \code{'Zero} and \code{'Succ}, which are denoted as types with apostrophes to prevent ambiguity with their value-level counterparts. These inhabitants are type constructors, where \code{'Zero} has kind \code{Nat}, and \code{'SuccNat} has kind \code{Nat} $\rightarrow$ \code{Nat}. 
+We use the \code{DataKinds} compiler extension to automatically create a kind \code{Nat}, with the same structure as the original \code{Nat} datatype. The promoted kind \code{Nat} has the inhabitants \code{'Zero} and \code{'Succ}, which are denoted as types with apostrophes to prevent ambiguity with their value-level counterparts. These inhabitants are type constructors, where \code{'Zero} has kind \code{Nat}, and \code{'Succ} has kind \code{Nat} $\rightarrow$ \code{Nat}. 
 
 \begin{figure}[h]
     \centering
@@ -59,7 +62,7 @@ We use the \code{DataKinds} compiler extension to automatically create a kind \c
         Values & Zero, Succ & \\
         \hline
     \end{tabular}
-    \caption{Illustration of the promoted kinds automatically created by \code{DataKinds}}
+    \caption{Illustration of the promoted kinds and types automatically created by \code{DataKinds}}
     \label{fig:datakindsPromotion}
 \end{figure}
 
@@ -92,9 +95,9 @@ The additional type precision awarded by GADTs moves errors from run-time to com
 
 % TODO: Additional precision with types resused many time in this project
 
-\subsection{The Elem GADT}
+\section{Elem GADT}
 
-Before using GADTs to construct the set of well-typed, we first define the \code{Elem} GADT. A value of type \code{Elem xs x} is a proof that the type \code{x} is an element of the list of types \code{xs}. 
+Before using GADTs to construct the set of well-typed expressions, we first define the \code{Elem} GADT. A value of type \code{Elem xs x} is a proof that the type \code{x} is an element of the list of types \code{xs}. 
 
 \begin{lstlisting}
     data Elem :: [a] -> a -> * where
@@ -111,7 +114,8 @@ Note that \code{[a]} is the kind consisting of lists with type-level elements of
 
 % TODO: Curry-Howard Isomorphism
 
-\subsection{The Expr GADT}
+\section{Typed Expression Syntax}
+\label{sect:typedsyntax}
 
 We are now ready to define the \code{Expr} GADT which represents the set of well-typed terms of the STLC.
 
@@ -126,26 +130,19 @@ A value of type \code{Expr ctx ty} is a well-typed expression of the STLC of typ
 % TODO: explain typing context
 % TODO: DeBruijn Variables
 
-The \code{Var} constructor corresponds to the variable typing judgement rule. A variable can only be a well-typed expression of type \code{ty} if it is present with the correct type in the typing context. \code{Var} takes a value of type \code{Elem ctx ty} which proves that \code{ty} is in the typing context \code{ctx} by specifying which element of the context the variable is referring to.
+The \code{Var} constructor corresponds to the variable typing judgement rule. A variable can only be a well-typed expression of type \code{ty} if \code{ty} is present in the typing context. \code{Var} takes a value of type \code{Elem ctx ty} which proves that \code{ty} is in the typing context \code{ctx} by specifying which element of the context the variable is referring to.
 % TODO: Check above
-Note that instead of indexing variables by names or de Bruijn indices as we saw in Chapter \ref{chap:untypednbe}, typed variables are indexed by an \code{Elem} value. However, the values of type \code{Elem xs x} act very similarly to de Bruijn indices, as \code{Elem} values refer to bound variables by how many bindings are between the instance of the variable and where it was bound. For example \code{Var (Tail Head)} could have type \code{Expr '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}, where \code{Tail Head} has the type \code{Elem '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}. The \code{Elem} value \code{Tail Head} tells us where to find the type in the typing context, which in turn specifies how many new bound variables have been introduced since the variable we are interested in was bound, exactly like a de Bruijn index.
+Note that instead of indexing variables by names or de Bruijn indices as we saw in Chapter \ref{chap:untypednbe}, typed variables are indexed by an \code{Elem} value. However, the values of type \code{Elem xs x} act very similarly to de Bruijn indices, as \code{Elem} values refer to bound variables by how many bindings there are between the instance of the variable and where it was bound. For example \code{Var (Tail Head)} could have type \code{Expr '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}, where \code{Tail Head} has the type \code{Elem '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}. The \code{Elem} value tells us where to find the type in the typing context, which in turn specifies how many new bound variables have been introduced since the variable we are interested in was bound, exactly like a de Bruijn index.
 
 The \code{Lam} constructor corresponds to the abstraction typing judgement rule. Given a well-typed expression of type \code{result} in the context \code{arg:ctx}, we can abstract out the first variable of context into a bound variable with a lambda expression, producing a new term with the function type \code{arg :-> result} in the weakened context. We refer to the argument of the \code{Lam} constructor as the body of the lambda.
 
 The \code{App} constructor corresponds directly to the application typing judgement rule, where we can apply one term to another if they share the same context \code{ctx} and the type of the second term matches the argument type \code{arg} of the first term.
 
-% TODO: Why awesome?
-This syntax offers multiple allows 
+Using this implementation for \code{Expr}, it is guaranteed that an expression of type \code{Expr ctx ty} is well-typed. In Chapter \ref{chap:typednbe}, we will see how \code{Expr}'s constructors are used to form new expressions guaranteed to be well-typed by their type.
 
 % TODO: Input/Ouput type as pre-condition/post-condition (eg empty context), programs as proof
 
 Note that the apostrophes on type-level constructors are not required for successful compilation, as GHC can infer whether the constructor is type-level or value-level automatically. 
 % TODO: Useful for getting started, now bulky, omit for remainer of dissertation
 
-\section{Notes}
 
-Advantage over ADTs: type refinement by constructor
-
-Example 3: Expr - all values well typed by construction
-
-Input/Ouput type as pre-condition/post-condition (eg empty context)
