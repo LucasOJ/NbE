@@ -1,6 +1,9 @@
 \chapter{Representation of the Simply Typed Lambda Calculus}
 \label{chap:typedlamadacalculus}
 
+% TODO: STLC Abbreviation defininition
+% TODO: Why choose STLC? Just as powerful as Turing Machine, simple
+
 Before implementing NbE for the STLC, we define datatypes representing the typed lambda calculus in Haskell. 
 
 \section{Types}
@@ -12,18 +15,26 @@ We first define a type syntax to represent the monotypes of the simply typed lam
     infixr 9 :->
 \end{lstlisting}
 
-In this type syntax there is a single base type \code{BaseTy} and an infix type constructor \code{:->}, where the type \code{A :-> B} represents the function type from type \code{A} to type \code{B}. For this implementation of NbE, a single base type is sufficient to capture the structure of simple types. Multiple base types would have introduced unnecessary complexity.
+In this type syntax there is a single base type \code{BaseTy} and an infix type constructor \code{:->}, where the type \code{A :-> B} represents the function type from type \code{A} to type \code{B}. For this implementation of NbE, a single base type is sufficient to capture the structure of simply typed terms. Multiple base types would have introduced unnecessary complexity.
 %TODO: Justify why, type checking?
 Normalising terms with polymorphic types is beyond the scope of this project.
  
 \code{infixr :-> 9} specifies that \code{:->} is right associative, so as per convention, the type \code{A :-> (B :-> C)} can instead be written \code{A :-> B :-> C}.
 
-\section{Typed terms}
+\section{Typed Terms}
 
 For typed NbE, we only normalise well-typed terms of the lambda calculus. Although well-typed terms are a subset of the untyped terms, the definition of untyped terms from Chapter \ref{chap:untypednbe} doesn't carry enough information to check that terms are well-typed. 
 % TODO: Review, not great angle as type more related than just information storage
 Instead, we define a richer definiton of typed terms that carry type information proposed by Richard Eisenberg \cite{GADTs}. This information will be stored in the Haskell type of each term value by utilising compiler extensions for GHC. 
 % Well-typed by contruction better for haskell than type checking 
+
+\begin{lstlisting}
+    data Expr = Var Ty [Ty] Int
+              | Lam Ty [Ty] Expr
+              | App Ty [Ty] Expr Expr
+\end{lstlisting}
+
+% TODO: Repeated parameter - property of Expr' rather than constructor
 
 \subsection{Introduction to Generalised Algebraic Datatypes (GADTs)}
 
@@ -52,6 +63,8 @@ We use the \code{DataKinds} compiler extension to automatically create a kind \c
     \label{fig:datakindsPromotion}
 \end{figure}
 
+%TODO: Motivation for GADT, well typed by contruction, typesafe (pre-condition), problem-> Solution, ADT Implementation and drawbacks
+
 We use the \code{'Zero} and \code{'Succ} type constructors to represent numbers at the type level. Using the \code{GADTs} extension we now define the datatype for length-indexed vectors using GADT syntax.
 
 \begin{lstlisting}
@@ -59,10 +72,12 @@ We use the \code{'Zero} and \code{'Succ} type constructors to represent numbers 
         ZeroVec :: Vec a 'Zero
         SuccVec :: a -> Vec a n -> Vec a ('Succ n)
 \end{lstlisting}
+\cite{GADTs}
 
 % TODO: PolyKinds vs KindSignatures
 
-A value of type \code{Vec a n} is a vector of n elements of type \code{a}. For this definition we also require the \code{KindSignatures} compiler extension to specify the kind signature of \code{Vec} in the first line of the definition. This specifies that the first type parameter of \code{Vec}, denoting the type of the elements of the vector, should be of kind \code{*}. This is because the type of the elements of the vector could be any concrete type, all of which are inhabitants of \code{*}. The first line also specifies that the second type parameter of \code{Vec}, denoting the length of the vector, should be a type of the promoted kind \code{Nat}, which we use to represent a type-level number. The returned kind \code{*} in the kind signature specifies that each vector has a concrete type of kind \code{*}.
+A value of type \code{Vec a n} is a vector of \code{n} elements of type \code{a}. For this definition we also require the \code{KindSignatures} compiler extension to specify the kind signature of \code{Vec} in the first line of the definition. This specifies that the first type parameter of \code{Vec}, denoting the type of the elements of the vector, should be of kind \code{*}. This is because the type of the elements of the vector could be any concrete type, all of which are inhabitants of \code{*}. The first line also specifies that the second type parameter of \code{Vec}, denoting the length of the vector, should be a type inhabiting the promoted kind \code{Nat}, which we use to represent a type-level number. The returned kind \code{*} in the kind signature specifies that each vector has a concrete type of kind \code{*}.
+% TODO: Define "concrete type"
 
 Since \code{Vec} is a GADT, the types of each constructor are given explicitly. The \code{ZeroVec} constructor creates a vector with elements of any type (since \code{a} is universally quantified over) of length \code{'Zero}. The \code{SuccVec} constructor takes a value of type \code{a} and a vector of \code{n} elements of type \code{a}, and returns a new vector of length \code{'Succ n}. For example, the vector \code{SuccVec "a" (SuccVec "b" ZeroVec)} has type \code{Vec String ('Succ ('Succ 'Zero))}.
 
@@ -79,27 +94,58 @@ The additional type precision awarded by GADTs moves errors from run-time to com
 
 \subsection{The Elem GADT}
 
-Before using GADTs to construct the set of well-typed, we first define a useful GADT: \code{Elem}.
+Before using GADTs to construct the set of well-typed, we first define the \code{Elem} GADT. A value of type \code{Elem xs x} is a proof that the type \code{x} is an element of the list of types \code{xs}. 
 
-A value of type \code{Elem x xs} is a proof that the value \code{x} is in the list \code{xs}. 
-
-% TODO: Need stronger kind sigantures, polykinds (implies datakinds and kindsignatures)
-
+\begin{lstlisting}
+    data Elem :: [a] -> a -> * where
+        Head :: Elem (x ': xs) x
+        Tail :: Elem xs x -> Elem (y ': xs) x
+\end{lstlisting}
 \cite{GADTs}
-Explicit type constructor arguments
-Language extensions:
-DataKinds, TypeOperators, PolyKinds, GADTs.
 
-Example 1: Vec - indexed type advantage since total function
+The \code{Head} constructor produces a proof that \code{x} is an element of any list beginning with \code{x}. Given a value of type \code{Elem xs x}, the \code{Tail} constructor produces a proof that \code{x} is an element of the extended list \code{y:xs} for any element \code{y}. For example, the value \code{Tail Head} could have type \code{Elem '["a","b","c","d"] "b"} or type \code{Elem '[4, 5] 5}. 
 
-Fails for replicate without work \cite{DependentHaskell}
+Note that all elements of said lists are at the type level, so we need a promoted type-level version of the \code{(:)} list constructor. Promotion to the type-level constructor \code{'(:)} is handled by \code{DataKinds}, however we need to enable the \code{TypeOperators} extension to allow the use of the infix operators at type-level. Without the \code{TypeOperators} extension we could use the syntax \code{Elem ('(:) x xs)} in the definition of \code{Head}, however this is harder to read.
+
+Note that \code{[a]} is the kind consisting of lists with type-level elements of the same kind \code{a}, rather than the standard list of value-level elements of the same type. To write this polymorphic kind signature we need the \code{PolyKinds} extension, which extends the \code{KindSignatures} extension by enabling polymorphic kind signatures. Since \code{KindSignatures} is a dependency of \code{PolyKinds} it is implicitly enabled when using \code{PolyKinds}, so we can replace the \code{KindSignatures} extension declaration with \code{PolyKinds}.
+
+% TODO: Curry-Howard Isomorphism
+
+\subsection{The Expr GADT}
+
+We are now ready to define the \code{Expr} GADT which represents the set of well-typed terms of the STLC.
+
+\begin{lstlisting}
+    data Expr :: [Ty] -> Ty -> * where
+        Var :: Elem ctx ty -> Expr ctx ty
+        Lam :: Expr (arg ': ctx) result -> Expr ctx (arg ':-> result)
+        App :: Expr ctx (arg ':-> result) -> Expr ctx arg -> Expr ctx result 
+\end{lstlisting}
+
+A value of type \code{Expr ctx ty} is a well-typed expression of the STLC of type \code{ty} in the typing context \code{ctx}. Hence, \code{Expr} encodes the set of valid typing judgements, where each constructor encodes a typing judgement rule in its type.
+% TODO: explain typing context
+% TODO: DeBruijn Variables
+
+The \code{Var} constructor corresponds to the variable typing judgement rule. A variable can only be a well-typed expression of type \code{ty} if it is present with the correct type in the typing context. \code{Var} takes a value of type \code{Elem ctx ty} which proves that \code{ty} is in the typing context \code{ctx} by specifying which element of the context the variable is referring to.
+% TODO: Check above
+Note that instead of indexing variables by names or de Bruijn indices as we saw in Chapter \ref{chap:untypednbe}, typed variables are indexed by an \code{Elem} value. However, the values of type \code{Elem xs x} act very similarly to de Bruijn indices, as \code{Elem} values refer to bound variables by how many bindings are between the instance of the variable and where it was bound. For example \code{Var (Tail Head)} could have type \code{Expr '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}, where \code{Tail Head} has the type \code{Elem '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}. The \code{Elem} value \code{Tail Head} tells us where to find the type in the typing context, which in turn specifies how many new bound variables have been introduced since the variable we are interested in was bound, exactly like a de Bruijn index.
+
+The \code{Lam} constructor corresponds to the abstraction typing judgement rule. Given a well-typed expression of type \code{result} in the context \code{arg:ctx}, we can abstract out the first variable of context into a bound variable with a lambda expression, producing a new term with the function type \code{arg :-> result} in the weakened context. We refer to the argument of the \code{Lam} constructor as the body of the lambda.
+
+The \code{App} constructor corresponds directly to the application typing judgement rule, where we can apply one term to another if they share the same context \code{ctx} and the type of the second term matches the argument type \code{arg} of the first term.
+
+% TODO: Why awesome?
+This syntax offers multiple allows 
+
+% TODO: Input/Ouput type as pre-condition/post-condition (eg empty context), programs as proof
+
+Note that the apostrophes on type-level constructors are not required for successful compilation, as GHC can infer whether the constructor is type-level or value-level automatically. 
+% TODO: Useful for getting started, now bulky, omit for remainer of dissertation
+
+\section{Notes}
 
 Advantage over ADTs: type refinement by constructor
 
-Justification of base type \textit{extension work??: string/integer type}
-Example 2: IsElem - value as proof
 Example 3: Expr - all values well typed by construction
-
-Difference between [] and '[] (kinds vs types) in terms of levels
 
 Input/Ouput type as pre-condition/post-condition (eg empty context)
