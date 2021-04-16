@@ -1,6 +1,218 @@
 \chapter{Normalising the Typed Lambda Calculus}
 \label{chap:typednbe}
 
+\section{Target Syntax}
+
+% TODO: Colour for polymorphic type variable
+
+\begin{lstlisting}
+    data NormalExpr :: [Ty] -> Ty -> * where
+        NormalNeutral :: NeutralExpr ctx ty -> NormalExpr ctx ty
+        NormalLam :: NormalExpr (arg ': ctx) result -> NormalExpr ctx (arg :-> result)    
+
+    data NeutralExpr :: [Ty] -> Ty -> * where
+        NeutralVar :: Elem ctx ty -> NeutralExpr ctx ty
+        NeutralApp :: NeutralExpr ctx (arg :-> result) -> NormalExpr ctx arg 
+                   -> NeutralExpr ctx result
+
+\end{lstlisting}
+
+% TODO: Justify why V has context (need to reify, example, normalise identity), describe what we need
+
+\section{Evaluation Constraints}
+
+% TODO: First evaluation problem - returning correct semantic context, lambda has different syntax
+% - Solved for us by Andras
+
+\begin{lstlisting}
+    
+\end{lstlisting}
+% TODO: Correspondence with untyped env, Motivate need for tracking type, ctxV
+
+\section{Order Preserving Embeddings (OPEs)}
+
+\begin{lstlisting}
+    data OPE :: [Ty] -> [Ty] -> * where
+        Empty :: OPE '[] '[]
+        Drop  :: OPE ctx1 ctx2 -> OPE (x : ctx1) ctx2
+        Keep  :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
+\end{lstlisting}
+
+% TODO: Motivate why need in terms of eval, read Andras Paper
+
+\section{Semantic Set}
+
+\begin{lstlisting}
+    data V :: [Ty] -> Ty -> * where 
+        Base :: NormalExpr ctx BaseTy -> V ctx BaseTy
+        Function :: (forall strong . OPE strong weak -> V strong arg -> V strong result) 
+                 -> V weak (arg :-> result)
+\end{lstlisting}
+
+% TODO: Rank-2 extention, OPE relevance
+
+\section{Evaluation}
+
+\subsection{Environment}
+
+\begin{lstlisting}
+    data Env :: [Ty] -> [Ty] -> * where
+        EmptyEnv :: Env '[] ctxV
+        ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
+\end{lstlisting}
+
+\begin{lstlisting}
+    envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty 
+    envLookup Head     (ConsEnv _    v) = v
+    envLookup (Tail n) (ConsEnv prev _) = envLookup n prev
+\end{lstlisting}
+
+\subsection{Variable Case}
+
+\begin{lstlisting}
+    eval :: Env ctx ctxV -> Expr ctx ty -> V ctxV ty
+    eval env (Var n) = envLookup n env
+\end{lstlisting}
+
+\subsection{Lambda Case}
+
+\begin{lstlisting}
+    eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
+        where
+            f :: (SingContext ctxV') => OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
+            f ope v = eval (ConsEnv (strengthenEnv ope env) v) body
+\end{lstlisting}
+
+%TODO: Scoped Type variables
+% - Show what types are inferred without
+
+% TODO: Remove singletons
+
+\begin{lstlisting}
+    strengthenElem :: OPE strong weak -> Elem weak ty -> Elem strong ty
+    strengthenElem Empty      v        = v
+    strengthenElem (Drop ope) v        = Tail (strengthenElem ope v)
+    strengthenElem (Keep ope) Head     = Head
+    strengthenElem (Keep ope) (Tail v) = Tail (strengthenElem ope v)
+
+    strengthenNormal :: OPE strong weak -> NormalExpr weak ty -> NormalExpr strong ty
+    strengthenNormal ope (NormalNeutral n) = NormalNeutral (strengthenNeutral ope n)
+    strengthenNormal ope (NormalLam n)     = NormalLam (strengthenNormal (Keep ope) n)
+
+    strengthenNeutral :: OPE strong weak -> NeutralExpr weak ty -> NeutralExpr strong ty
+    strengthenNeutral ope (NeutralVar n)   = NeutralVar (strengthenElem ope n)
+    strengthenNeutral ope (NeutralApp f a) = NeutralApp (strengthenNeutral ope f) (strengthenNormal ope a) 
+
+    strengthenV :: (SingContext strong) => OPE strong weak -> V weak ty -> V strong ty
+    strengthenV ope                      (Base nf) = Base (strengthenNormal ope nf)
+    strengthenV (ope :: OPE strong weak) (Function (f :: forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result)) = Function f' 
+        where
+            f' :: (SingContext stronger) => OPE stronger strong -> V stronger arg -> V stronger result
+            f' ope' = f (composeOPEs ope ope')
+    
+    strengthenEnv :: (SingContext c) => OPE c b -> Env a b -> Env a c
+    strengthenEnv _   EmptyEnv         = EmptyEnv
+    strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthenV ope v)
+\end{lstlisting}
+
+\subsection{Application Case}
+
+%TODO: Motivate by pattern matching on type not possible in Haskell
+
+\begin{lstlisting}
+    eval env (App f a) = appV (eval env f) (eval env a) 
+        where
+            appV (Function f') a' = f' (idOPEFromEnv env) a'
+
+            idOPEFromEnv :: (SingContext ctxV) => Env ctx ctxV -> OPE ctxV ctxV
+            idOPEFromEnv _ = idOpe 
+\end{lstlisting}
+
+\begin{lstlisting}
+    class SingContext ctx where
+        idOpe :: OPE ctx ctx
+
+    instance SingContext '[] where
+        idOpe = Empty
+
+    instance (SingContext xs, SingTy x) => SingContext (x:xs) where
+        idOpe = Keep idOpe
+\end{lstlisting}
+
+%TODO Include code link
+
+\section{Reification}
+
+\begin{lstlisting}
+    reify :: V ctx ty -> NormalExpr ctx ty
+    reify (Base nf)    = nf
+    reify (Function f) = NormalLam (reify (f ope (evalNeutral (NeutralVar Head)))) 
+        where
+            ope = weakenContext (Function f)
+
+            weakenContext :: (SingContext ctx) => V ctx ty -> OPE (x:ctx) ctx
+            weakenContext _ = wk 
+
+    evalNeutral :: (SingTy ty, SingContext ctx) => NeutralExpr ctx ty -> V ctx ty
+    evalNeutral = evalNeutral' singTy
+
+    evalNeutral' :: (SingContext ctx) => STy ty -> NeutralExpr ctx ty -> V ctx ty
+    evalNeutral' SBaseTy       n                                       = Base (NormalNeutral n)  
+    evalNeutral' (SArrow _ _)  (n :: NeutralExpr ctx (arg :-> result)) = Function f 
+        where
+            f :: (SingContext strongerCtx) => OPE strongerCtx ctx -> V strongerCtx arg -> V strongerCtx result
+            f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
+\end{lstlisting}
+
+% TODO: Motivate evalNeutral and rename, contrast with standard eval
+
+\begin{lstlisting}
+    data STy :: Ty -> * where
+        SBaseTy :: STy BaseTy
+        SArrow  :: (SingTy a, SingTy b) => STy a -> STy b -> STy (a :-> b)
+
+    class SingTy a where
+        singTy :: STy a 
+
+    instance SingTy 'BaseTy where
+        singTy = SBaseTy
+
+    instance (SingTy a, SingTy b) => SingTy (a :-> b) where
+        singTy = SArrow singTy singTy
+\end{lstlisting}
+
+\begin{lstlisting}
+    class SingContext ctx where
+        idOpe :: OPE ctx ctx
+        wk :: OPE (x:ctx) ctx
+        wk = Drop idOpe
+\end{lstlisting}
+
+\section{Normalisation}
+
+\begin{lstlisting}
+    normalise :: (SingContext ctx) => Expr ctx ty -> NormalExpr ctx ty
+    normalise = reify . eval initialEnv
+\end{lstlisting}
+
+\begin{lstlisting}
+    class SingContext ctx where
+        idOpe :: OPE ctx ctx
+        wk :: OPE (x:ctx) ctx
+        wk = Drop idOpe
+        initialEnv :: Env ctx ctx
+
+    instance SingContext '[] where
+        idOpe = Empty
+        initialEnv = EmptyEnv
+
+    instance (SingContext xs, SingTy x) => SingContext (x:xs) where
+        idOpe = Keep idOpe
+        initialEnv = ConsEnv (strengthenEnv wk initialEnv) (evalNeutral (NeutralVar Head))
+\end{lstlisting}
+
+\section{Notes}
+
 Investigation: Are GADTs in Haskell powerful enough? Types are erased at runtime so true dependent typing not part of Haskell (programs at type level)
 
 Advantage over ADTs: type refinement by constructor
