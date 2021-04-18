@@ -50,13 +50,13 @@ type ClosedExpr ty = Expr '[] ty
 
 -- Target Syntax (Normal Forms)
 -- Mirrors Expr other than that you can't apply a term to a Lambda
-data NormalExpr :: [Ty] -> Ty -> * where
-    NormalNeutral :: NeutralExpr ctx ty -> NormalExpr ctx ty
-    NormalLam :: NormalExpr (arg ': ctx) result -> NormalExpr ctx (arg :-> result)    
+data NormalForm :: [Ty] -> Ty -> * where
+    NormalNeutral :: NeutralForm ctx ty -> NormalForm ctx ty
+    NormalLam :: NormalForm (arg ': ctx) result -> NormalForm ctx (arg :-> result)    
 
-data NeutralExpr :: [Ty] -> Ty -> * where
-    NeutralVar :: Elem ctx ty -> NeutralExpr ctx ty
-    NeutralApp :: NeutralExpr ctx (arg :-> result) -> NormalExpr ctx arg -> NeutralExpr ctx result
+data NeutralForm :: [Ty] -> Ty -> * where
+    NeutralVar :: Elem ctx ty -> NeutralForm ctx ty
+    NeutralApp :: NeutralForm ctx (arg :-> result) -> NormalForm ctx arg -> NeutralForm ctx result
 
 -- Semantics
 
@@ -75,11 +75,11 @@ strengthenElem (Drop ope) v        = Tail (strengthenElem ope v)
 strengthenElem (Keep ope) Head     = Head
 strengthenElem (Keep ope) (Tail v) = Tail (strengthenElem ope v)
 
-strengthenNormal :: OPE strong weak -> NormalExpr weak ty -> NormalExpr strong ty
+strengthenNormal :: OPE strong weak -> NormalForm weak ty -> NormalForm strong ty
 strengthenNormal ope (NormalNeutral n) = NormalNeutral (strengthenNeutral ope n)
 strengthenNormal ope (NormalLam n)     = NormalLam (strengthenNormal (Keep ope) n)
 
-strengthenNeutral :: OPE strong weak -> NeutralExpr weak ty -> NeutralExpr strong ty
+strengthenNeutral :: OPE strong weak -> NeutralForm weak ty -> NeutralForm strong ty
 strengthenNeutral ope (NeutralVar n)   = NeutralVar (strengthenElem ope n)
 strengthenNeutral ope (NeutralApp f a) = NeutralApp (strengthenNeutral ope f) (strengthenNormal ope a) 
 
@@ -90,14 +90,14 @@ composeOPEs (Drop v) (Keep u) = Drop (composeOPEs v u)
 composeOPEs (Keep v) (Keep u) = Keep (composeOPEs v u)
 
 data V :: [Ty] -> Ty -> * where 
-    Base :: NormalExpr ctx BaseTy -> V ctx BaseTy
+    Base :: NormalForm ctx BaseTy -> V ctx BaseTy
     -- Values with type BaseTy are normal forms
 
-    Function :: (SingContext weak, SingTy arg) => 
-        (forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result) 
+    Function :: (SingContext ctx, SingTy arg) => 
+        (forall ctx' . (SingContext ctx') => OPE ctx' ctx -> V ctx' arg -> V ctx' result) 
         -- Quantifies over all contexts containing 'weak'
         -- Requires Rank2Types
-        -> V weak (arg :-> result)
+        -> V ctx (arg :-> result)
     -- Values with a function type a -> b are a semantic function from a -> b in any context stronger than that of the value 
     
 strengthenV :: (SingContext strong) => OPE strong weak -> V weak ty -> V strong ty
@@ -139,7 +139,7 @@ eval env (App f a) = appV (eval env f) (eval env a)
         idOPEFromEnv :: (SingContext ctxV) => Env ctx ctxV -> OPE ctxV ctxV
         idOPEFromEnv _ = idOpe 
 
-reify :: V ctx ty -> NormalExpr ctx ty
+reify :: V ctx ty -> NormalForm ctx ty
 reify (Base nf)    = nf
 reify (Function f) = NormalLam (reify (f ope (evalNeutral (NeutralVar Head)))) 
     where
@@ -148,17 +148,17 @@ reify (Function f) = NormalLam (reify (f ope (evalNeutral (NeutralVar Head))))
         weakenContext :: (SingContext ctx) => V ctx ty -> OPE (x:ctx) ctx
         weakenContext _ = wk 
 
-evalNeutral :: (SingTy ty, SingContext ctx) => NeutralExpr ctx ty -> V ctx ty
+evalNeutral :: (SingTy ty, SingContext ctx) => NeutralForm ctx ty -> V ctx ty
 evalNeutral = evalNeutral' singTy
 
-evalNeutral' :: (SingContext ctx) => STy ty -> NeutralExpr ctx ty -> V ctx ty
+evalNeutral' :: (SingContext ctx) => STy ty -> NeutralForm ctx ty -> V ctx ty
 evalNeutral' SBaseTy       n                                       = Base (NormalNeutral n)  
-evalNeutral' (SArrow _ _)  (n :: NeutralExpr ctx (arg :-> result)) = Function f 
+evalNeutral' (SArrow _ _)  (n :: NeutralForm ctx (arg :-> result)) = Function f 
     where
         f :: (SingContext strongerCtx) => OPE strongerCtx ctx -> V strongerCtx arg -> V strongerCtx result
         f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
 
-normalise :: (SingContext ctx) => Expr ctx ty -> NormalExpr ctx ty
+normalise :: (SingContext ctx) => Expr ctx ty -> NormalForm ctx ty
 normalise = reify . eval initialEnv
 
 --- Normal form display
@@ -166,11 +166,11 @@ normalise = reify . eval initialEnv
 normaliseDB :: (SingContext ctx) => Expr ctx ty -> Untyped.DbExpr 
 normaliseDB = normalToDB . normalise
 
-normalToDB  :: NormalExpr ctx ty -> Untyped.DbExpr 
+normalToDB  :: NormalForm ctx ty -> Untyped.DbExpr 
 normalToDB (NormalNeutral n) = neutralToDB n
 normalToDB (NormalLam body)  = Untyped.DbLam (normalToDB body)
 
-neutralToDB :: NeutralExpr ctx ty -> Untyped.DbExpr 
+neutralToDB :: NeutralForm ctx ty -> Untyped.DbExpr 
 neutralToDB (NeutralVar v)   = Untyped.DbVar (elemToIndex v)
 neutralToDB (NeutralApp m n) = Untyped.DbApp (neutralToDB m) (normalToDB n)
 

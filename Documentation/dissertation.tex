@@ -43,15 +43,18 @@
   basicstyle=\ttfamily\small,
   keywordstyle=[0]\bfseries\color{bittersweet},
   keywordstyle=[1]\bfseries\color{teal},
+  keywordstyle=[3]\bfseries\color{dark},
   keywordstyle=[2]\bfseries,
   columns=spaceflexible,
   morekeywords=[0]{data, where, type, class, instance, case, of, do, return, infixr},
-  morekeywords=[1]{Name, String, Expr, NormalForm, NeutralForm, Env, Map, V, NeutralV, FreshName, State, Set, DbExpr, Int, Ty, Nat, Vec, Elem, OPE},
+  morekeywords=[1]{Name, String, Expr, NormalForm, NeutralForm, Env, Map, V, NeutralV, FreshName, State, Set, DbExpr, Int, Ty, Nat, Vec, Elem, OPE, NeutralExpr, NormalExpr, forall},
   morekeywords=[2]{Z, S, True, case, of},
+  morekeywords=[3]{ctx, ty, arg, result, ctx1, ctx2, strong, weak, ctxV, ctx'},
   mathescape=true,
   keepspaces=true,
   aboveskip=10pt,
-  belowskip=10pt
+  belowskip=10pt,
+  alsoletter={'}
 }
 
 \newcommand{\code}{\lstinline}
@@ -59,6 +62,7 @@
 \begin{document}
 \definecolor{teal}{rgb}{0.0, 0.5, 0.5}
 \definecolor{bittersweet}{rgb}{1.0, 0.44, 0.37}
+\definecolor{dark}{rgb}{0.1, 0.45, 1.0}
 
 % =============================================================================
 

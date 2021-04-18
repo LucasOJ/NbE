@@ -1,35 +1,38 @@
 \chapter{Normalising the Typed Lambda Calculus}
 \label{chap:typednbe}
 
+In this chapter, we translate an Agda implementation of NbE developed by Andras Kovacs \cite{AgdaNbe} for the STLC into Haskell.
+
 \section{Target Syntax}
 
-% TODO: Colour for polymorphic type variable
+% TODO: Colour for polymorphic type variable in certain blocks
+
+We construct set of the simply typed normal terms \code{NormalForm} by combining the approach seen for the untyped terms in Chapter \ref{chap:untypednbe} with the GADT syntax from Chapter \ref{chap:typedlamadacalculus} to ensure the inhabitants are well-typed.
 
 \begin{lstlisting}
-    data NormalExpr :: [Ty] -> Ty -> * where
-        NormalNeutral :: NeutralExpr ctx ty -> NormalExpr ctx ty
-        NormalLam :: NormalExpr (arg ': ctx) result -> NormalExpr ctx (arg :-> result)    
+    data NormalForm :: [Ty] -> Ty -> * where
+        NormalNeutral :: NeutralForm ctx ty -> NormalForm ctx ty
+        NormalLam :: NormalForm (arg ': ctx) result -> NormalForm ctx (arg :-> result)    
 
-    data NeutralExpr :: [Ty] -> Ty -> * where
-        NeutralVar :: Elem ctx ty -> NeutralExpr ctx ty
-        NeutralApp :: NeutralExpr ctx (arg :-> result) -> NormalExpr ctx arg 
-                   -> NeutralExpr ctx result
+    data NeutralForm :: [Ty] -> Ty -> * where
+        NeutralVar :: Elem ctx ty -> NeutralForm ctx ty
+        NeutralApp :: NeutralForm ctx (arg :-> result) -> NormalForm ctx arg 
+                   -> NeutralForm ctx result
 
 \end{lstlisting}
 
 % TODO: Justify why V has context (need to reify, example, normalise identity), describe what we need
 
-\section{Evaluation Constraints}
+
 
 % TODO: First evaluation problem - returning correct semantic context, lambda has different syntax
 % - Solved for us by Andras
 
-\begin{lstlisting}
-    
-\end{lstlisting}
 % TODO: Correspondence with untyped env, Motivate need for tracking type, ctxV
 
-\section{Order Preserving Embeddings (OPEs)}
+\section{Order Preserving Embeddings}
+
+In the lambda case of \code{eval}, NbE evaluates the body of the lambda in a stronger context where a new bound variable is introduced (as seen in Chapter \ref{chap:untypednbe}). To continue the evaluation of the body ...
 
 \begin{lstlisting}
     data OPE :: [Ty] -> [Ty] -> * where
@@ -38,18 +41,35 @@
         Keep  :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
 \end{lstlisting}
 
+A value of type \code{OPE a b} is a proof that the list of types \code{b} is a subsequence of \code{a}. The three constructors correspond to the different ways of constructing such a proof. The \code{Empty} constructor corresponds to the trivial case that the empty list contains itself. Given a proof that \code{ctx2} is embedded in \code{ctx1}, the \code{Drop} constructor extends the proof to show that \code{ctx2} is embedded in \code{x:ctx1}, and the \code{Keep} constructor extends the proof to show that \code{x:ctx2} is embedded in \code{x:ctx1}. For example, \code{Drop (Keep Empty))} could have the (Haskell) type \code{OPE '[BaseTy :-> BaseTy, BaseTy] '[BaseTy]}.
+
+% Q: Order changes dB Indices if drop from middle?
+
 % TODO: Motivate why need in terms of eval, read Andras Paper
 
 \section{Semantic Set}
 
+The normalisation function should return a \code{NormalForm} with the same type and typing context as the original term, so should have the type signature \code{Expr ctx ty $\rightarrow$ NormalForm ctx ty}. Because \code{reify} is a pure function of the semantic set \code{V}, this set must also be indexed by the typing context and type of the expression to preserve the typing information (as seen in the kind signature below). 
+
 \begin{lstlisting}
     data V :: [Ty] -> Ty -> * where 
         Base :: NormalExpr ctx BaseTy -> V ctx BaseTy
-        Function :: (forall strong . OPE strong weak -> V strong arg -> V strong result) 
-                 -> V weak (arg :-> result)
+        Function :: (forall ctx' .  OPE ctx' ctx -> V ctx' arg -> V ctx' result) 
+                 -> V ctx (arg :-> result)
 \end{lstlisting}
 
-% TODO: Rank-2 extention, OPE relevance
+The semantic set for typed NbE is the key difference between the typed and untyped implementations of NbE this dissertation presents. 
+
+% TODO: Justify
+
+The \code{Base} constructor specifies that values of \code{V}with type \code{BaseTy} are normal forms. The \code{Function} constructor creates a value of function type \code{arg :-> result} given a function with type signature 
+\begin{lstlisting}
+    forall ctx' . OPE ctx' ctx -> V ctx' arg -> V ctx' result 
+\end{lstlisting}
+
+By default, in GHC, there is only have one “level” of polymorphism, where type variables are implicitly universally quantified. However, within the function type signature above, we want to treat \code{ctx} as fixed, and quantify over all larger contexts. To achieve this we use higher-ranked polymorphism with the explicit \code{forall} syntax to delay the quantification of \code{ctx'} until after \code{ctx} has been bound. Then, by treating \code{OPE} as a relation on typing contexts, we specify that \code{ctx'} must be larger than \code{ctx}. We can think of the \code{OPE} argument as a predicate on the quantification, in that the function first takes a proof that \code{ctx'} contains \code{ctx}. To enable higher ranked polymorphism, we use the \code{Rank2Types} extension. The result is that the \code{Function} constructor takes a function with partially applied type \code{V ctx' arg $\rightarrow$ V ctx' result} where \code{ctx'} is any contexr larger than the original context, and returns a semantic value in the original context with type \code{arg :-> result}
+
+% TODO: Motivation for structure
 
 \section{Evaluation}
 
