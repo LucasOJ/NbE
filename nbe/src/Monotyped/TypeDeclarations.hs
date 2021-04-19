@@ -52,7 +52,7 @@ type ClosedExpr ty = Expr '[] ty
 -- Mirrors Expr other than that you can't apply a term to a Lambda
 data NormalForm :: [Ty] -> Ty -> * where
     NormalNeutral :: NeutralForm ctx ty -> NormalForm ctx ty
-    NormalLam :: NormalForm (arg ': ctx) result -> NormalForm ctx (arg :-> result)    
+    NormalLam     :: NormalForm (arg ': ctx) result -> NormalForm ctx (arg :-> result)    
 
 data NeutralForm :: [Ty] -> Ty -> * where
     NeutralVar :: Elem ctx ty -> NeutralForm ctx ty
@@ -114,9 +114,6 @@ data Env :: [Ty] -> [Ty] -> * where
     EmptyEnv :: Env '[] ctxV
     ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
 
-envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty 
-envLookup Head     (ConsEnv _    v) = v
-envLookup (Tail n) (ConsEnv prev _) = envLookup n prev
 
 strengthenEnv :: (SingContext c) => OPE c b -> Env a b -> Env a c
 strengthenEnv _   EmptyEnv         = EmptyEnv
@@ -124,6 +121,11 @@ strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthe
 
 eval :: (SingContext ctxV) => Env ctx ctxV -> Expr ctx ty -> V ctxV ty
 eval env                   (Var n)                               = envLookup n env
+    where
+        envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty 
+        envLookup Head     (ConsEnv _    v) = v
+        envLookup (Tail n) (ConsEnv tail _) = envLookup n tail
+
 eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
     where
         f :: (SingContext ctxV') => OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
