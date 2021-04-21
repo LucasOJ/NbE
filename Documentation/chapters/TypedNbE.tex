@@ -110,6 +110,8 @@ As before, we pattern match on each of the three expression constructors. We sta
             envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty 
             envLookup Head     (ConsEnv _    v) = v
             envLookup (Tail n) (ConsEnv tail _) = envLookup n tail
+
+    strengthenEnv :: OPE ctxV' ctxV -> Env ctx ctxV -> Env ctx ctxV'
 \end{lstlisting}
 
 As in the untyped case, for variables we simply lookup the semantic value associated with the bound variable from the environment. Since variables are indexed by an \code{Elem} value, \code{envLookup} takes an \code{Elem} value and returns the associated semantic value.
@@ -130,43 +132,71 @@ Note that \code{envLookup} does not pattern matched on the \code{EmptyEnv} case.
             f ope v = eval (ConsEnv (strengthenEnv ope env) v) body
 \end{lstlisting}
 
-\begin{lstlisting}
-    eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
-        where
-            f :: OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
-            f ope v = eval (ConsEnv (strengthenEnv ope env) v) body
-\end{lstlisting}
+As in the untyped implementation, in the lambda case \code{eval} returns a semantic function that maps from a semantic argument \code{v} to the body of the lambda. We evaluate the body in an updated environment where we have bound the variable \code{Var Head} to \code{v}. This means the typing context of the returned semantic value will be larger than that of the original expression.
 
-%TODO: Scoped Type variables
+% TODO: Finish above
+
+Since all the semantic values in the environment must have the same typing context, we expand the typing context of each element in the environment to match the typing context \code{ctxV'} of \code{v}. The \code{OPE} argument of \code{f} makes such an expansion possible. By the weakening property of the STLC [CITE], a term will remain well-typed if we expand its typing context with new variable bindings. From a proof perspective, the \code{OPE ctxV' ctxV} argument proves that all the semantic elements of the context  ... 
+% Does weakening hold for semantic values?
+Note that since all semantic elements of \code{env} have the same context \code{ctxV}, and \code{f} ...
+
+% TODO: Scoped Type variables
 % - Show what types are inferred without
 
 % TODO: Remove singletons
+\code{strengthenEnv} takes an \code{OPE ctxV' ctxV} and an environment, and returns the same environment where each semantic values has the expanded context \code{ctxV'}
+
+To implement \code{strengthenEnv}, we first build a series of functions for strengthening each constituent part of a semantic value.
 
 \begin{lstlisting}
     strengthenElem :: OPE strong weak -> Elem weak ty -> Elem strong ty
-    strengthenElem Empty      v        = v
     strengthenElem (Drop ope) v        = Tail (strengthenElem ope v)
-    strengthenElem (Keep ope) Head     = Head
     strengthenElem (Keep ope) (Tail v) = Tail (strengthenElem ope v)
+    strengthenElem (Keep ope) Head     = Head
+\end{lstlisting}
 
+% Q: Can drop Empty case, weak = '[], no elem inhabitiants
+
+First we strengthen \code{Elem} values which represent variables. We use the naming convention \code{OPE strong weak} since \code{strong} could be any context with containing at least the same variable bindings as \code{weak} and more. 
+Intuitively the proposition the type of \code{strengthenElem} generates makes sense: if \code{ty} is an element of the context \code{weak}, then it is also an element in any context \code{strong} containing \code{weak}.
+
+% TODO: Explain cases?
+
+\begin{lstlisting} 
     strengthenNormal :: OPE strong weak -> NormalExpr weak ty -> NormalExpr strong ty
     strengthenNormal ope (NormalNeutral n) = NormalNeutral (strengthenNeutral ope n)
     strengthenNormal ope (NormalLam n)     = NormalLam (strengthenNormal (Keep ope) n)
 
     strengthenNeutral :: OPE strong weak -> NeutralExpr weak ty -> NeutralExpr strong ty
     strengthenNeutral ope (NeutralVar n)   = NeutralVar (strengthenElem ope n)
-    strengthenNeutral ope (NeutralApp f a) = NeutralApp (strengthenNeutral ope f) (strengthenNormal ope a) 
+    strengthenNeutral ope (NeutralApp f a) = NeutralApp (strengthenNeutral ope f) 
+                                                        (strengthenNormal ope a) 
 
-    strengthenV :: (SingContext strong) => OPE strong weak -> V weak ty -> V strong ty
+\end{lstlisting}
+
+\code{strengthenNeutral} and \code{strengthenNormal} strengthen entire expressions. In the \code{NormalLam} case, type refinement guarentees that the typing context for the body of the lambda binds an variable with type \code{arg}. Hence, we have to expand the given OPE with an additional \code{Keep}. In the \code{strengthenNeutral} case we use \code{strengthenElem} to point variables to their updated indices in the expanded context.
+
+\begin{lstlisting}
+    strengthenV :: OPE strong weak -> V weak ty -> V strong ty
     strengthenV ope                      (Base nf) = Base (strengthenNormal ope nf)
     strengthenV (ope :: OPE strong weak) (Function (f :: forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result)) = Function f' 
         where
             f' :: (SingContext stronger) => OPE stronger strong -> V stronger arg -> V stronger result
             f' ope' = f (composeOPEs ope ope')
-    
+\end{lstlisting}
+
+\begin{lstlisting}
     strengthenEnv :: (SingContext c) => OPE c b -> Env a b -> Env a c
     strengthenEnv _   EmptyEnv         = EmptyEnv
     strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthenV ope v)
+\end{lstlisting}
+
+
+\begin{lstlisting}
+    eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
+        where
+            f :: OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
+            f ope v = eval (ConsEnv (strengthenEnv ope env) v) body
 \end{lstlisting}
 
 \subsection{Application Case}

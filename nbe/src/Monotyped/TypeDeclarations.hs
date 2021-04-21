@@ -70,7 +70,6 @@ data OPE :: [Ty] -> [Ty] -> * where
     Keep  :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
 
 strengthenElem :: OPE strong weak -> Elem weak ty -> Elem strong ty
-strengthenElem Empty      v        = v
 strengthenElem (Drop ope) v        = Tail (strengthenElem ope v)
 strengthenElem (Keep ope) Head     = Head
 strengthenElem (Keep ope) (Tail v) = Tail (strengthenElem ope v)
@@ -115,7 +114,7 @@ data Env :: [Ty] -> [Ty] -> * where
     ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
 
 
-strengthenEnv :: (SingContext c) => OPE c b -> Env a b -> Env a c
+strengthenEnv :: (SingContext ctxV') => OPE ctxV' ctxV -> Env ctx ctxV -> Env ctx ctxV'
 strengthenEnv _   EmptyEnv         = EmptyEnv
 strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthenV ope v)
 
