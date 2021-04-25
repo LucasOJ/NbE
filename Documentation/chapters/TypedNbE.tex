@@ -7,7 +7,7 @@ In this chapter, we translate an Agda implementation of NbE developed by Andras 
 
 % TODO: Colour for polymorphic type variable in certain blocks
 
-We construct the set of the simply typed normal terms \code{NormalForm} by combining the approach seen for the untyped terms in Chapter \ref{chap:untypednbe} with the GADT syntax from Chapter \ref{chap:typedlamadacalculus} to ensure its inhabitants are well-typed.
+We construct the set of the simply typed normal terms \code{NormalForm} by combining the approach seen for the untyped terms in Chapter \ref{chap:untypednbe} with the GADT syntax from Chapter \ref{chap:typedlamadacalculus} to ensure \code{NormalForm}'s inhabitants are well-typed.
 
 \begin{lstlisting}
     data NormalForm :: [Ty] -> Ty -> * where
@@ -49,7 +49,11 @@ A value of type \code{OPE a b} is a proof that the list of types \code{b} is a s
 
 \section{Semantic Set}
 
-The \code{normalise} function should return a \code{NormalForm} with the same type and typing context as the original term, so should have the type signature \code{Expr ctx ty $\rightarrow$ NormalForm ctx ty}. Because \code{reify} is a pure function of the semantic set \code{V}, this set must also be indexed by the typing context and type of the expression to preserve the typing information (as seen in the kind signature below). 
+% TODO: AGDA screenshot here
+
+% Differences between Haskell and Agda (presentation)
+
+The \code{normalise} function should return a \code{NormalForm} with the same type and typing context as the original term, so should have the type signature \code{Expr ctx ty $\rightarrow$ NormalForm ctx ty}. Because \code{reify} is a pure function of the semantic set \code{V}, this set must also be indexed by the typing context and type of the expression to preserve the type information needed to verify a term is well-typed (as seen in the kind signature below). 
 
 \begin{lstlisting}
     data V :: [Ty] -> Ty -> * where 
@@ -58,16 +62,21 @@ The \code{normalise} function should return a \code{NormalForm} with the same ty
                  -> V ctx (arg :-> result)
 \end{lstlisting}
 
-The semantic set for typed NbE is the key difference between the typed and untyped implementations of NbE this dissertation presents. 
+Like the set of syntax \code{Expr}, the well-typed semantic set \code{V} is indexed by the typing context of kind \code{[Ty]} and the type of the expression of kind \code{Ty}. 
 
-% TODO: Justify
+% TODO: Rewrite below in terms of translating from Agda
 
 The \code{Base} constructor specifies that values of \code{V} with type \code{BaseTy} are normal forms. The \code{Function} constructor creates a value of function type \code{arg :-> result} when given a function with type signature 
 \begin{lstlisting}
     forall ctx' . OPE ctx' ctx -> V ctx' arg -> V ctx' result 
 \end{lstlisting}
 
-By default, in GHC, there is only have one “level” of polymorphism, where type variables are implicitly universally quantified. However, within the function type signature above, we want to treat \code{ctx} as fixed, and quantify over all larger contexts. To achieve this we use higher-ranked polymorphism with the explicit \code{forall} syntax to delay the quantification of \code{ctx'} until after \code{ctx} has been bound. We can think of the \code{OPE} argument as a predicate on the quantification, in that the function first takes a proof that \code{ctx'} contains \code{ctx}. To enable higher ranked polymorphism, we use the \code{Rank2Types} extension. The result is that the \code{Function} constructor takes a function with the partially applied type \code{V ctx' arg $\rightarrow$ V ctx' result} where \code{ctx'} is any context larger than the original context, and returns a semantic value in the original context with type \code{arg :-> result}
+By default, in GHC, there is only have one “level” of polymorphism, where type variables are implicitly universally quantified. However, within the function type signature above, we want to treat \code{ctx} as fixed, and quantify over all larger contexts.
+% Those with OPE to original context
+To achieve this we use higher-ranked polymorphism with the explicit \code{forall} syntax to delay the quantification of \code{ctx'} until after \code{ctx} has been bound. We can think of the \code{OPE} argument as a predicate on the quantification, in that the function first takes a proof that \code{ctx'} contains \code{ctx}. To enable higher ranked polymorphism, we use the \code{Rank2Types} extension. 
+
+% TODO: Include this?? 
+% The result is that the \code{Function} constructor takes a function with the partially applied type \code{V ctx' arg $\rightarrow$ V ctx' result} where \code{ctx'} is any context larger than the original context, and returns a semantic value in the original context with type \code{arg :-> result}
 
 % TODO: Motivation for structure
 
@@ -76,6 +85,8 @@ By default, in GHC, there is only have one “level” of polymorphism, where ty
 In this section we implement the typed \code{eval} function.
 
 \subsection{Environment}
+
+% TODO: Relation to agda
 
 As in the untyped implementation of NbE, during evaluation we need an environment to track bound variables and their associated semantic values. Since our variables have the same structure as de Bruijn indices [CITE IN PAPER] it suffices to use a list as the environment, where the $n$th element of the list corresponds to the variable at de Bruijn index $n$.
 
@@ -110,8 +121,6 @@ As before, we pattern match on each of the three expression constructors. We sta
             envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty 
             envLookup Head     (ConsEnv _    v) = v
             envLookup (Tail n) (ConsEnv tail _) = envLookup n tail
-
-    strengthenEnv :: OPE ctxV' ctxV -> Env ctx ctxV -> Env ctx ctxV'
 \end{lstlisting}
 
 As in the untyped case, for variables we simply lookup the semantic value associated with the bound variable from the environment. Since variables are indexed by an \code{Elem} value, \code{envLookup} takes an \code{Elem} value and returns the associated semantic value.
@@ -130,6 +139,8 @@ Note that \code{envLookup} does not pattern matched on the \code{EmptyEnv} case.
     eval env (Lam body) = Function f 
         where
             f ope v = eval (ConsEnv (strengthenEnv ope env) v) body
+
+    strengthenEnv :: OPE ctxV' ctxV -> Env ctx ctxV -> Env ctx ctxV'
 \end{lstlisting}
 
 As in the untyped implementation, in the lambda case \code{eval} returns a semantic function that maps from a semantic argument \code{v} to the body of the lambda. We evaluate the body in an updated environment where we have bound the variable \code{Var Head} to \code{v}. This means the typing context of the returned semantic value will be larger than that of the original expression.

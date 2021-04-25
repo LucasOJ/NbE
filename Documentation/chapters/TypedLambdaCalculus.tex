@@ -126,7 +126,7 @@ We are now ready to define the \code{Expr} GADT which represents the set of well
 
 A value of type \code{Expr ctx ty} is a well-typed expression of the STLC of type \code{ty} in the typing context \code{ctx}. Hence, \code{Expr} encodes the set of valid typing judgements, where each constructor encodes a typing judgement rule in its type.
 % TODO: explain typing context
-% TODO: DeBruijn Variables
+% TODO: DeBruijn Variables earlier
 
 The \code{Var} constructor corresponds to the variable typing judgement rule. A variable can only be a well-typed expression of type \code{ty} if \code{ty} is present in the typing context. \code{Var} takes a value of type \code{Elem ctx ty} which proves that \code{ty} is in the typing context \code{ctx} by specifying which element of the context the variable is referring to.
 % TODO: Check above
