@@ -108,7 +108,7 @@ The \code{Head} constructor produces a proof that \code{x} is an element of any 
 
 Note that all elements of said lists are at the type level, so we need a promoted type-level version of the \code{(:)} list constructor. Promotion to the type-level constructor \code{'(:)} is handled by \code{DataKinds}, however we need to enable the \code{TypeOperators} extension to allow the use of the infix operators at type-level. Without the \code{TypeOperators} extension we could use the syntax \code{Elem ('(:) x xs)} in the definition of \code{Head}, however this is harder to read.
 
-Note that \code{[a]} is the kind consisting of lists with type-level elements of the same kind \code{a}, rather than the standard list of value-level elements of the same type. To write this polymorphic kind signature we need the \code{PolyKinds} extension, which extends the \code{KindSignatures} extension by enabling polymorphic kind signatures. Since \code{KindSignatures} is a dependency of \code{PolyKinds} it is implicitly enabled when using \code{PolyKinds}, so we can replace the \code{KindSignatures} extension declaration with \code{PolyKinds}.
+\code{[a]} is the kind consisting of lists with type-level elements of the same kind \code{a}, rather than the standard list of value-level elements of the same type. To write this polymorphic kind signature we need the \code{PolyKinds} extension, which extends the \code{KindSignatures} extension by enabling polymorphic kind signatures. Since \code{KindSignatures} is a dependency of \code{PolyKinds} it is implicitly enabled when using \code{PolyKinds}, so we can replace the \code{KindSignatures} extension declaration with \code{PolyKinds}.
 
 % TODO: Curry-Howard Isomorphism
 
@@ -124,13 +124,18 @@ We are now ready to define the \code{Expr} GADT which represents the set of well
         App :: Expr ctx (arg ':-> result) -> Expr ctx arg -> Expr ctx result 
 \end{lstlisting}
 
-A value of type \code{Expr ctx ty} is a well-typed expression of the STLC of type \code{ty} in the typing context \code{ctx}. Hence, \code{Expr} encodes the set of valid typing judgements, where each constructor encodes a typing judgement rule in its type.
-% TODO: explain typing context
+A value of type \code{Expr ctx ty} is a well-typed expression of the STLC of type \code{ty} in the typing context \code{ctx}. Hence, \code{Expr} encodes the set of valid typing judgements, where each constructor encodes a typing judgement rule in its type. The $n$th element of the context corresponds to the type of the bound variable with de Bruijn index $n$.
 % TODO: DeBruijn Variables earlier
 
-The \code{Var} constructor corresponds to the variable typing judgement rule. A variable can only be a well-typed expression of type \code{ty} if \code{ty} is present in the typing context. \code{Var} takes a value of type \code{Elem ctx ty} which proves that \code{ty} is in the typing context \code{ctx} by specifying which element of the context the variable is referring to.
-% TODO: Check above
-Note that instead of indexing variables by names or de Bruijn indices as we saw in Chapter \ref{chap:untypednbe}, typed variables are indexed by an \code{Elem} value. However, the values of type \code{Elem xs x} act very similarly to de Bruijn indices, as \code{Elem} values refer to bound variables by how many bindings there are between the instance of the variable and where it was bound. The $i$th element of the typing context corresponds to the type of the element at de Bruijn index $i$. For example \code{Var (Tail Head)} could have type \code{Expr '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}, where \code{Tail Head} has the type \code{Elem '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}. The \code{Elem} value tells us where to find the type in the typing context, which in turn specifies how many new bound variables have been introduced since the variable we are interested in was bound, exactly like a de Bruijn index.
+The \code{Var} constructor corresponds to the variable typing judgement rule. Instead of indexing variables by names or de Bruijn indices as we saw in Chapter \ref{chap:untypednbe}, typed variables are indexed by an \code{Elem} value.
+
+% TODO: purpose 1 - only make variables with valid bindings (well-typed)
+
+A variable can only be a well-typed expression of type \code{ty} if \code{ty} is present in the typing context. The argument of type \code{Elem ctx ty} proves that \code{ty} is in the typing context \code{ctx}. Thus, it is impossible to construct a variable which is not well-typed.
+
+% TODO: purpose 2 - refer to variables
+From inspecting the constructors of \code{Elem}, we notice that all \code{Elem} values take the form of \code{Tail ( $\dots$ (Tail Head) $\dots$ )}. 
+The \code{Elem} value with $n$ tail constructors refers to $n$th most recently bound variable in the typing context, and hence to the variable with de Bruijn index $n$. For example \code{Var (Tail Head)} could have type \code{Expr '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}, where \code{Tail Head} has the type \code{Elem '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}. Here \code{Tail Head} refers to the bound variable with de Bruijn index 1 (since it has one \code{Tail} constructor), which we see from the context has type \code{BaseTy :-> BaseTy}.
 
 % TODO: Reword above
 
