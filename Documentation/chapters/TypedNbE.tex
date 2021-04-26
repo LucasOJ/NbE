@@ -49,11 +49,18 @@ A value of type \code{OPE a b} is a proof that the list of types \code{b} is a s
 
 \section{Semantic Set}
 
-% TODO: AGDA screenshot here
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{./images/typed_semantic_set.png}
+    \caption{Agda implementation of the typed semantic set from \cite{AgdaNbe}}
+    \label{fig:agdaSemanticSet}
+\end{figure}
 
 % Differences between Haskell and Agda (presentation)
 
-The \code{normalise} function should return a \code{NormalForm} with the same type and typing context as the original term, so should have the type signature \code{Expr ctx ty $\rightarrow$ NormalForm ctx ty}. Because \code{reify} is a pure function of the semantic set \code{V}, this set must also be indexed by the typing context and type of the expression to preserve the type information needed to verify a term is well-typed (as seen in the kind signature below). 
+% The \code{normalise} function should return a \code{NormalForm} with the same type and typing context as the original term, so should have the type signature \code{Expr ctx ty $\rightarrow$ NormalForm ctx ty}. Because \code{reify} is a pure function of the semantic set \code{V}, this set must also be indexed by the typing context and type of the expression to preserve the type information needed to verify a term is well-typed (as seen in the kind signature below). 
+
+In Andras Kovacs' implementation of NbE \cite{AgdaNbe}, the type of the semantic set is determined by the function $\text{Ty}^\text{N}$. This function takes a type and context expression as values, and returns the type of the corresponding semantic set, where \code{Set} can be thought of as kind \code{*}. In Haskell we do not have a way to directly express a function which takes values and returns types. Instead we define the GADT \code{V} which represents the typed semantic set.
 
 \begin{lstlisting}
     data V :: [Ty] -> Ty -> * where 
@@ -62,21 +69,21 @@ The \code{normalise} function should return a \code{NormalForm} with the same ty
                  -> V ctx (arg :-> result)
 \end{lstlisting}
 
-Like the set of syntax \code{Expr}, the well-typed semantic set \code{V} is indexed by the typing context of kind \code{[Ty]} and the type of the expression of kind \code{Ty}. 
+\code{V} is indexed by a context of kind \code{[Ty]} and a type of kind \code{Ty}, which were value-level function arguments in \ref{fig:agdaSemanticSet}. \code{V} is necessarily indexed by these parameters at the type level since \code{normalise} should return a normal form with the same context and type as the given syntactic expression. \code{reify} is a pure function of the semantic set, so \code{V} must preserve this type-level information. 
 
-% TODO: Rewrite below in terms of translating from Agda
+$\text{Ty}^\text{N}$ pattern matches on the type argument and is defined in two cases: a base type case and a function case, where the Agda implementation uses $\iota$ for \code{BaseTy}. In our implementation the expression type is not given as a value-level argument that can be pattern matched on, so instead we use constructors to emulate a similar behaviour. From the return type of the constructors we see that values of \code{V} with type \code{BaseTy} can only be created by the \code{Base} constructor. Thus, if we are given a value of type \code{V ctx BaseTy}, GHC can deduce the value takes the form \code{Base n} where \code{n :: NormalExpr ctx Expr}. \code{n} is an inhabitant of the type returned by the Agda implementation in the base type case. 
+Similarly, given a value of type \code{V ctx (A :-> B)}, GHC can deduce that the value must have the form \code{Function f}, since only the \code{Function} constructor can produce semantic values with function type. Again, we can extract a semantic value of the correct type since the type of \code{f} is exactly the type specified by the function type case of $\text{Ty}^\text{N}$. Thus, we have successfully mimicked the behaviour of $\text{Ty}^\text{N}$ in Haskell.
 
-The \code{Base} constructor specifies that values of \code{V} with type \code{BaseTy} are normal forms. The \code{Function} constructor creates a value of function type \code{arg :-> result} when given a function with type signature 
+% TODO: Limitations of above technique
+
+The argument to the \code{Function} constructor has following the type signature.
 \begin{lstlisting}
     forall ctx' . OPE ctx' ctx -> V ctx' arg -> V ctx' result 
 \end{lstlisting}
 
-By default, in GHC, there is only have one “level” of polymorphism, where type variables are implicitly universally quantified. However, within the function type signature above, we want to treat \code{ctx} as fixed, and quantify over all larger contexts.
+By default, in GHC, there is only have one “level” of polymorphism, where type variables are implicitly universally quantified. However, as seen in \ref{fig:agdaSemanticSet}, we want to treat \code{ctx} as fixed, before quantifying over \code{ctx'}, where we use \code{ctx} instead of $\Gamma$ and \code{ctx'} instead of $\Delta$.
 % Those with OPE to original context
-To achieve this we use higher-ranked polymorphism with the explicit \code{forall} syntax to delay the quantification of \code{ctx'} until after \code{ctx} has been bound. We can think of the \code{OPE} argument as a predicate on the quantification, in that the function first takes a proof that \code{ctx'} contains \code{ctx}. To enable higher ranked polymorphism, we use the \code{Rank2Types} extension. 
-
-% TODO: Include this?? 
-% The result is that the \code{Function} constructor takes a function with the partially applied type \code{V ctx' arg $\rightarrow$ V ctx' result} where \code{ctx'} is any context larger than the original context, and returns a semantic value in the original context with type \code{arg :-> result}
+To achieve this we use higher-ranked polymorphism with the explicit \code{forall} syntax to delay the quantification of \code{ctx'} until after \code{ctx} has been bound. To enable higher ranked polymorphism, we use the \code{Rank2Types} extension. 
 
 % TODO: Motivation for structure
 
