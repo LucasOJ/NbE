@@ -48,7 +48,7 @@ data Expr' = Var' Ty [Ty] Int
 
 data V :: [Ty] -> Ty -> * where 
     Base :: NormalForm ctx BaseTy -> V ctx BaseTy
-    Function :: (V ctx arg -> V ctx result) -> V ctx (arg :-> result)
+    Function :: (V (x:ctx) arg -> V (x:ctx) result) -> V ctx (arg :-> result)
 
 data Env :: [Ty] -> [Ty] -> * where
     EmptyEnv :: Env '[] ctxV
@@ -57,5 +57,5 @@ data Env :: [Ty] -> [Ty] -> * where
 eval :: Env ctx ctx -> Expr ctx ty -> V ctx ty
 eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
     where
-        f :: V ctx arg -> V ctx result
+        f :: V (arg:ctx) arg -> V (arg:ctx) result
         f v = eval (ConsEnv env v) body

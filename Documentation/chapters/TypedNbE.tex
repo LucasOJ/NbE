@@ -85,7 +85,9 @@ By default, in GHC, there is only have one “level” of polymorphism, where ty
 % Those with OPE to original context
 To achieve this we use higher-ranked polymorphism with the explicit \code{forall} syntax to delay the quantification of \code{ctx'} until after \code{ctx} has been bound. To enable higher ranked polymorphism, we use the \code{Rank2Types} extension. 
 
-% TODO: Motivation for structure
+The \code{OPE} parameter acts as a precondition requiring a proof that \code{ctx'} contains \code{ctx}, so intuitively this type quantifies over all contexts containing \code{ctx}.
+
+% TODO: Justify use of OPE further? 
 
 \section{Evaluation}
 
@@ -95,7 +97,7 @@ In this section we implement the typed \code{eval} function.
 
 % TODO: Relation to agda
 
-As in the untyped implementation of NbE, during evaluation we need an environment to track bound variables and their associated semantic values. Since our variables have the same structure as de Bruijn indices [CITE IN PAPER] it suffices to use a list as the environment, where the $n$th element of the list corresponds to the variable at de Bruijn index $n$.
+As in the untyped implementation of NbE, during evaluation we need an environment to track bound variables and their associated semantic values. Since our variables have the same structure as de Bruijn indices, it suffices to use a list as the environment, where the $n$th element of the list corresponds to the variable with de Bruijn index $n$.
 
 % TODO: Motivated by the variable case
 % Need extra typing info
@@ -106,7 +108,7 @@ As in the untyped implementation of NbE, during evaluation we need an environmen
         ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
 \end{lstlisting}
 
-From the constructors, we see that \code{Env} GADT has the same value-level structure as the standard Haskell list. However, we have used GADT syntax to enforce additional restrictions on the types of the elements in the environment. From the kind signature, we see that \code{Env} is indexed by two typing contexts. From the type of \code{ConsEnv}, we see that the first of these tracks the types of the semantic elements stored in the environment. The second typing context is the typing context shared by all semantic values stored in the environment. The motivation for indexing \code{Env} by these typing contexts is due to \code{envLookup} function defined below in \ref{subsect:typedVarCase}.
+From the constructors, we see that the \code{Env} GADT has the same value-level structure as the standard Haskell list. However, we have used GADT syntax to enforce additional restrictions on the types of the elements in the environment. From the kind signature, we see that \code{Env} is indexed by two typing contexts. From the constructor types, we see that the first of these tracks the types of the semantic elements stored in the environment. The second typing context is the typing context shared by all semantic values stored in the environment. The motivation for indexing \code{Env} by these typing contexts is due to \code{envLookup} function defined below in \ref{subsect:typedVarCase}.
 
 
 % Why do ctxs have to match?
@@ -114,7 +116,7 @@ From the constructors, we see that \code{Env} GADT has the same value-level stru
 \subsection{Variable Case}
 \label{subsect:typedVarCase}
 
-Now that we have defined the environment, we are ready to implement the evaluation function \code{eval}.
+Now that we have defined the environment, we can begin implementing the evaluation function \code{eval}.
 
 \begin{lstlisting}
     eval :: Env ctx ctxV -> Expr ctx ty -> V ctxV ty
@@ -130,7 +132,7 @@ As before, we pattern match on each of the three expression constructors. We sta
             envLookup (Tail n) (ConsEnv tail _) = envLookup n tail
 \end{lstlisting}
 
-As in the untyped case, for variables we simply lookup the semantic value associated with the bound variable from the environment. Since variables are indexed by an \code{Elem} value, \code{envLookup} takes an \code{Elem} value and returns the associated semantic value.
+As in the untyped case, for variables we lookup the semantic value associated with the bound variable from the environment. Since variables are indexed by an \code{Elem} value, \code{envLookup} takes an \code{Elem} value and returns the associated semantic value.
 
 The additional type information allows us to make guarantees about the lookup. Since \code{n} is a value of type \code{Elem ctx ty}, we know that \code{ty} exists somewhere in the list \code{ctx}. Since \code{Env} is also indexed by the same context \code{ctx}, which tracks the types of the semantic values in the environment, it is guaranteed that the semantic value at the corresponding de Bruijn index exists in the environment with type \code{ty}. Thus, \code{envLookup} doesn't have to handle the case where the variable is not in the environment like in the untyped implementation; the types guarantee that all variables possible in the context \code{ctx} are bound in the environment.
 
@@ -141,30 +143,9 @@ Note that \code{envLookup} does not pattern matched on the \code{EmptyEnv} case.
 % TODO: Why return into ctxV?
 
 \subsection{Lambda Case}
+\label{subsect:typedEvalLamCase}
 
-\begin{lstlisting}
-    eval env (Lam body) = Function f 
-        where
-            f ope v = eval (ConsEnv (strengthenEnv ope env) v) body
-
-    strengthenEnv :: OPE ctxV' ctxV -> Env ctx ctxV -> Env ctx ctxV'
-\end{lstlisting}
-
-As in the untyped implementation, in the lambda case \code{eval} returns a semantic function that maps from a semantic argument \code{v} to the body of the lambda. We evaluate the body in an updated environment where we have bound the variable \code{Var Head} to \code{v}. This means the typing context of the returned semantic value will be larger than that of the original expression.
-
-% TODO: Finish above
-
-Since all the semantic values in the environment must have the same typing context, we expand the typing context of each element in the environment to match the typing context \code{ctxV'} of \code{v}. The \code{OPE} argument of \code{f} makes such an expansion possible. By the weakening property of the STLC [CITE], a term will remain well-typed if we expand its typing context with new variable bindings. From a proof perspective, the \code{OPE ctxV' ctxV} argument proves that all the semantic elements of the context  ... 
-% Does weakening hold for semantic values?
-Note that since all semantic elements of \code{env} have the same context \code{ctxV}, and \code{f} ...
-
-% TODO: Scoped Type variables
-% - Show what types are inferred without
-
-% TODO: Remove singletons
-\code{strengthenEnv} takes an \code{OPE ctxV' ctxV} and an environment, and returns the same environment where each semantic values has the expanded context \code{ctxV'}
-
-To implement \code{strengthenEnv}, we first build a series of functions for strengthening each constituent part of a semantic value.
+Before implementing the lambda case of \code{eval} we define the function \code{strengthenEnv} with type signature \code{OPE ctxV' ctxV -> Env ctx ctxV -> Env ctx ctxV'}. \code{strengthenEnv} takes an \code{OPE ctxV' ctxV} and an environment, and returns the same environment where each semantic value has the expanded context \code{ctxV'}. To implement \code{strengthenEnv}, we first build a series of functions for strengthening each constituent part of a semantic value.
 
 \begin{lstlisting}
     strengthenElem :: OPE strong weak -> Elem weak ty -> Elem strong ty
@@ -173,10 +154,10 @@ To implement \code{strengthenEnv}, we first build a series of functions for stre
     strengthenElem (Keep ope) Head     = Head
 \end{lstlisting}
 
-% Q: Can drop Empty case, weak = '[], no elem inhabitiants
+First we strengthen \code{Elem} values which index variables. We use the naming convention \code{OPE strong weak} since \code{strong} contains at least as many bindings as \code{weak}. 
+Intuitively if \code{ty} is an element of the context \code{weak}, then it is also an element of any context \code{strong} containing \code{weak}.
 
-First we strengthen \code{Elem} values which represent variables. We use the naming convention \code{OPE strong weak} since \code{strong} could be any context with containing at least the same variable bindings as \code{weak} and more. 
-Intuitively the proposition the type of \code{strengthenElem} generates makes sense: if \code{ty} is an element of the context \code{weak}, then it is also an element in any context \code{strong} containing \code{weak}.
+% TODO: Rephrase above
 
 % TODO: Explain cases?
 
@@ -192,23 +173,65 @@ Intuitively the proposition the type of \code{strengthenElem} generates makes se
 
 \end{lstlisting}
 
-\code{strengthenNeutral} and \code{strengthenNormal} strengthen entire expressions. In the \code{NormalLam} case, type refinement guarentees that the typing context for the body of the lambda binds an variable with type \code{arg}. Hence, we have to expand the given OPE with an additional \code{Keep}. In the \code{strengthenNeutral} case we use \code{strengthenElem} to point variables to their updated indices in the expanded context.
+\code{strengthenNeutral} and \code{strengthenNormal} strengthen entire expressions. Intuitively any well-typed expression in one context should also be well-typed in any larger context containing original, since adding variable bindings will not invalidate existing type judgements. \code{strengthenNormal} essentially encodes weakening for the normal form subset of the STLC. 
+
+In the \code{NormalLam} case, type refinement guarantees that the context for the body of the lambda binds an additional variable. Hence, we have to expand the given OPE with an additional \code{Keep}. In the \code{strengthenNeutral} case we use \code{strengthenElem} to point variables to their updated de Bruijn indices in the expanded context.
+
+\begin{lstlisting}
+    strengthenV :: OPE strong weak -> V weak ty -> V strong ty
+    strengthenV ope (Base nf)    = Base (strengthenNormal ope nf)
+    strengthenV ope (Function f) = Function f' 
+        where
+            f' ope' v = f (composeOPEs ope ope') v
+
+    composeOPEs :: OPE b c -> OPE a b -> OPE a c
+    composeOPEs v        Empty    = v
+    composeOPEs v        (Drop u) = Drop (composeOPEs v u)
+    composeOPEs (Drop v) (Keep u) = Drop (composeOPEs v u)
+    composeOPEs (Keep v) (Keep u) = Keep (composeOPEs v u)
+\end{lstlisting}
+
+\code{strengthenV} takes an \code{OPE} and a value of the semantic set, and strengthens the semantic value according to the given \code{OPE}.
+
+If \code{ope' :: strongest strong} and \code{v :: V strongest arg}, then to satisfy the type restrictions of the semantic set in the \code{Function} case, we need to apply \code{v} to \code{f} with an \code{OPE} of type \code{OPE strongest weak}. We produce such an \code{OPE} using the \code{composeOPEs} function, which implements transitivity for two \code{OPE}s.
+
+% Q: Deeper explanation required?
+% Q: Is this like weakening for semantics?
+
+However, GHC automatically infers that \code{f' :: OPE Any strong -> V Any arg -> V Any result}, which leads to a failure to compile at type-checking. This error occurs since all the contexts which GHC has inferred as \code{Any} must be the same to satisfy type-checking, and since values of type \code{Any} can be different, GHC cannot deduce necessary type equalities between these contexts. 
 
 \begin{lstlisting}
     strengthenV :: OPE strong weak -> V weak ty -> V strong ty
     strengthenV ope                      (Base nf) = Base (strengthenNormal ope nf)
-    strengthenV (ope :: OPE strong weak) (Function (f :: forall strong . (SingContext strong) => OPE strong weak -> V strong arg -> V strong result)) = Function f' 
-        where
-            f' :: (SingContext stronger) => OPE stronger strong -> V stronger arg -> V stronger result
-            f' ope' = f (composeOPEs ope ope')
+    strengthenV (ope :: OPE strong weak) (Function 
+        (f :: forall strong . OPE strong weak -> V strong arg -> V strong result)) 
+        = Function f' 
+            where
+                f' :: OPE strongest strong -> V strongest arg -> V strongest result
+                f' ope' = f (composeOPEs ope ope')
 \end{lstlisting}
 
+To resolve this issue we use type annotations, which are enabled by the \code{ScopedTypeVariables} extension. \code{ope :: OPE strong weak} binds the type variables \code{strong} and \code{weak} in the body of the case. We also bind the type variables for the constructor argument \code{f}. In the automatically inferred type signature for \code{f'}, \code{arg} and \code{result} were universally quantified. In the new type-annotated implementation, these type-variables are bound to the types of the arguments. We can then use these bound variables to specify the type of \code{f'}, where we explicitly declare that the contexts inferred as \code{Any} must be the same context \code{stronger}. With this additional type information, type-checking succeeds and the program compiles.
+
 \begin{lstlisting}
-    strengthenEnv :: (SingContext c) => OPE c b -> Env a b -> Env a c
+    strengthenEnv :: OPE ctxV' ctxV -> Env ctx ctxV -> Env ctx ctxV'
     strengthenEnv _   EmptyEnv         = EmptyEnv
     strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthenV ope v)
 \end{lstlisting}
 
+\code{strengthenEnv} maps over the elements of the environment, strengthening each one in turn with the \code{strengthenV} function.
+
+Now we are ready to implement the lambda case of the \code{eval} function.
+
+\begin{lstlisting}
+    eval env (Lam body) = Function f 
+        where
+            f ope v = eval (ConsEnv (strengthenEnv ope env) v) body
+\end{lstlisting}
+
+As in the untyped implementation, in the lambda case \code{eval} returns a semantic function that maps from a semantic argument \code{v} to the evaluated body of the lambda. We evaluate the body in an updated environment where we have bound the variable \code{Var Head} to \code{v}. However, if \code{ope :: ctxV' ctxV} then \code{v} has the context \code{ctxV'} whereas all the elements of \code{env} have context \code{ctxV}, so we cannot immediately add \code{v} to \code{env}. Instead, we have to strengthen the contexts of all the elements of the \code{env} using the given \code{ope} argument and \code{strengthenEnv}, which yields the strengthened environment of type \code{Env ctx ctxV'}. Now the contexts of the elements of the modified environment match the context \code{ctxV'} of \code{v}, so we can add \code{v} to the modified environment. 
+
+As in the \code{Function} case of \code{strengthenV}, the type of \code{f} that GHC infers is \code{OPE Any ctxV -> V Any arg -> V Any result}, which is too general and causes compilation to fail at type-checking.
 
 \begin{lstlisting}
     eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
@@ -216,6 +239,8 @@ Intuitively the proposition the type of \code{strengthenElem} generates makes se
             f :: OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
             f ope v = eval (ConsEnv (strengthenEnv ope env) v) body
 \end{lstlisting}
+
+Once we have annotated the argument types, type-checking and compilation succeed.
 
 \subsection{Application Case}
 
