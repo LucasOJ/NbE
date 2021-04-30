@@ -244,7 +244,41 @@ Once we have annotated the argument types, type-checking and compilation succeed
 
 \subsection{Application Case}
 
-%TODO: Motivate by pattern matching on type not possible in Haskell
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.38\textwidth]{./images/agda_id_ope.png}
+    \caption{Agda implementation of the identity OPE from \cite{AgdaNbe}}
+    \label{fig:agdaIdOPE}
+\end{figure}
+
+Before implementing the lambda case of \code{eval}, we need to define the identity \code{OPE} function from figure \ref{fig:agdaIdOPE} in Haskell. This function pattern matches on the type-level context $\Gamma$ and produces the identity \code{OPE} proving that $\Gamma$ is contained in $\Gamma$. In Haskell, standard functions cannot pattern match on types, so we use an alternative construction to pattern match at the type level.
+
+% IDEAS: Functionality, Agda implementation, why not in Haskell, solution, how works (runtime-lookup), limitations?
+
+% only well-typed for lists of types (not other type level lists) by OPE parameter
+
+\begin{lstlisting}
+    class SingContext ctx where
+        idOpe :: OPE ctx ctx
+
+    instance SingContext '[] where
+        idOpe = Empty
+
+    instance (SingContext xs) => SingContext (x:xs) where
+        idOpe = Keep idOpe
+\end{lstlisting}
+
+We create a class \code{SingContext} with a single method \code{idOpe}, which will return the identity \code{OPE} for the context \code{ctx}. We then use class instances to pattern match on the type of \code{ctx}. In the empty context case, \code{idOpe} returns the \code{Empty} \code{OPE}. In the \code{x:xs} case, we require that the type \code{xs} has a \code{SingContext} instance which grants us the ability to use the \code{idOpe :: OPE xs xs} function in the class instance. Applying the \code{OPE} for the tail of the list to the \code{Keep} constructor produces the identity \code{OPE} for the whole list. 
+
+The class instances essentially form a map from types to implementations of \code{idOpe}. Since \code{ctx} is a type variable that might not be known until runtime, the process of resolving the correct implementation to use could take place at runtime. This is surprising given that without extensions, GHC erases all type information during compilation. 
+
+% TODO: Talk more on this? - perfomance impact of carrying around type information
+
+% Q: dynamic Type-level pattern matching due to DataKinds?
+
+%TODO: Why OPE, type refinement guarentees function, GHC gives warning when try to enter 'appV (Base n) v = ...'
+
+We are now ready to define the application case of the \code{eval} function
 
 \begin{lstlisting}
     eval env (App f a) = appV (eval env f) (eval env a) 
@@ -255,18 +289,20 @@ Once we have annotated the argument types, type-checking and compilation succeed
             idOPEFromEnv _ = idOpe 
 \end{lstlisting}
 
-\begin{lstlisting}
-    class SingContext ctx where
-        idOpe :: OPE ctx ctx
+We first evaluate both terms of the application into the semantics, and then perform application at the semantic level using the \code{appV} function. 
 
-    instance SingContext '[] where
-        idOpe = Empty
+From the definition of \code{Function}, we can evaluate our function with a semantic argument in any context stronger than \code{ctxV}, where the \code{OPE} argument is a witness to the stronger context.
+% TODO: Rephrase above
+Since \code{a'} has the same context \code{ctxV} as \code{Function f'}, we evaluate the semantic function \code{f'} at \code{ctxV} by choosing the \code{OPE} of type \code{OPE ctxV ctxV}. We produce such a value using the \code{idOPEFromEnv} function. This function takes an environment but throws away the value since the only information needed to produce the \code{OPE} is the type-level semantic context \code{ctxV}. The \code{SingContext ctxV} constraint awards us the \code{idOPE :: OPE ctxV ctxV} function, which handles the type level pattern match on \code{ctxV} and produces the identity \code{OPE} of \code{ctxV}. 
 
-    instance (SingContext xs, SingTy x) => SingContext (x:xs) where
-        idOpe = Keep idOpe
-\end{lstlisting}
+To ensure that \code{ctxV} is an element of the \code{SingContext} class, we add the same constraint to \code{eval}'s type signature to give \code{eval :: (SingContext ctxV) => Env ctx ctxV -> Expr ctx ty -> V ctxV ty}. 
+Without this additional constraint, GHC cannot be sure that \code{ctxV} is a member of the \code{SingContext} class, so the constraint on \code{idOPEFromEnv} is not satisfied, and compilation fails. However, any function that uses \code{eval} now also has to prove that \code{ctxV} has a \code{SingContext} instance to satisfy \code{eval}'s constraint. By adding class constraints, we implicitly propagate this guarantee back through the call-stack. Eventually we reach a point where the \code{ctxV} variable is instantiated with a concrete type that GHC can infer has a \code{SingContext} instance, which it can't do for arbitrary type variables like \code{ctxV}. This adds boilerplate code to type signatures, but is necessary to ensure type-checking succeeds and does not impact the implementation of the functions themselves. For successful compilation we would need to retrofit previously defined code with the necessary class constraints, but since these constraints do not affect the operation of functions, we omit them for brevity.
 
-%TODO Include code link
+% TODO: Include code link
+
+Since it is guaranteed by the \code{Expr} GADT that \code{f} has a function type, it is guaranteed by \code{eval} that its semantic interpretation \code{eval env f} also has a function type. Thus, we only need to define the \code{Function} case of \code{appV}, since \code{Function} is the only constructor of \code{V} that can produce a semantic value of function type. In fact, when the \code{appV (Base v) a = ...} case is included, GHC detects that the pattern match is redundant and issues an \code{Inaccessible code} warning at compile time. 
+
+% TODO: Discuss why relevant
 
 \section{Reification}
 

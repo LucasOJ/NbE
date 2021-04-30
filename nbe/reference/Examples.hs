@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs, DataKinds, PolyKinds, TypeOperators #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Examples where
 
 data Nat = Zero | Succ Nat
@@ -40,6 +41,16 @@ data NeutralForm :: [Ty] -> Ty -> * where
     NeutralVar :: Elem ctx ty -> NeutralForm ctx ty
     NeutralApp :: NeutralForm ctx (arg :-> result) -> NormalForm ctx arg -> NeutralForm ctx result
 
+data OPE :: [Ty] -> [Ty] -> * where
+    Empty :: OPE '[] '[]
+    Drop  :: OPE ctx1 ctx2 -> OPE (x : ctx1) ctx2
+    Keep  :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2) 
+
+instance Show (OPE a b) where
+    show Empty = "Empty"
+    show (Drop n) = "Drop " ++ show n
+    show (Keep n) = "Keep " ++ show n
+
 -- CODE BELOW IS HYPOTHETICAL
 
 data Expr' = Var' Ty [Ty] Int
@@ -54,8 +65,16 @@ data Env :: [Ty] -> [Ty] -> * where
     EmptyEnv :: Env '[] ctxV
     ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
 
-eval :: Env ctx ctx -> Expr ctx ty -> V ctx ty
-eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
-    where
-        f :: V (arg:ctx) arg -> V (arg:ctx) result
-        f v = eval (ConsEnv env v) body
+
+class SingContext ctx where
+    idOpe :: OPE ctx ctx
+
+instance SingContext '[] where
+    idOpe = Empty
+
+instance (SingContext xs) => SingContext (x:xs) where
+    idOpe = Keep idOpe
+
+data Phantom a = P a
+
+instance Show (Phantom a) 
