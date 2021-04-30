@@ -74,7 +74,3 @@ instance SingContext '[] where
 
 instance (SingContext xs) => SingContext (x:xs) where
     idOpe = Keep idOpe
-
-data Phantom a = P a
-
-instance Show (Phantom a) 
