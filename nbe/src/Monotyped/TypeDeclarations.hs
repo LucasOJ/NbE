@@ -80,7 +80,7 @@ strengthenNormal ope (NormalLam n)     = NormalLam (strengthenNormal (Keep ope) 
 
 strengthenNeutral :: OPE strong weak -> NeutralForm weak ty -> NeutralForm strong ty
 strengthenNeutral ope (NeutralVar n)   = NeutralVar (strengthenElem ope n)
-strengthenNeutral ope (NeutralApp f a) = NeutralApp (strengthenNeutral ope f) (strengthenNormal ope a) 
+strengthenNeutral ope (NeutralApp f n) = NeutralApp (strengthenNeutral ope f) (strengthenNormal ope n) 
 
 composeOPEs :: OPE b c -> OPE a b -> OPE a c
 composeOPEs v        Empty    = v
@@ -133,31 +133,23 @@ eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f
         -- NOTE: Typchecks without strengthening context if don't give f type declaration
         -- Uses scoped typed variables
 
-eval env (App f a) = appV (eval env f) (eval env a) 
+eval env (App f n) = appV (eval env f) (eval env n) 
     where
-        appV (Function f') a' = f' (idOPEFromEnv env) a'
+        appV (Function f') n' = f' (idOPEFromEnv env) n'
 
         idOPEFromEnv :: (SingContext ctxV) => Env ctx ctxV -> OPE ctxV ctxV
         idOPEFromEnv _ = idOpe 
 
 reify :: V ctx ty -> NormalForm ctx ty
 reify (Base nf)    = nf
-reify (Function f) = NormalLam (reify (f ope (evalNeutral (NeutralVar Head)))) 
+reify (Function f) = NormalLam (reify (f extendedOpe boundVar)) 
     where
-        ope = weakenContext (Function f)
+        boundVar = evalVar (NeutralVar Head)
 
-        weakenContext :: (SingContext ctx) => V ctx ty -> OPE (x:ctx) ctx
-        weakenContext _ = wk 
+        extendedOpe = extendOpe (Function f)
 
-evalNeutral :: (SingTy ty, SingContext ctx) => NeutralForm ctx ty -> V ctx ty
-evalNeutral = evalNeutral' singTy
-
-evalNeutral' :: (SingContext ctx) => STy ty -> NeutralForm ctx ty -> V ctx ty
-evalNeutral' SBaseTy       n                                       = Base (NormalNeutral n)  
-evalNeutral' (SArrow _ _)  (n :: NeutralForm ctx (arg :-> result)) = Function f 
-    where
-        f :: (SingContext strongerCtx) => OPE strongerCtx ctx -> V strongerCtx arg -> V strongerCtx result
-        f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
+        extendOpe :: (SingContext ctx) => V ctx ty -> OPE (arg:ctx) ctx
+        extendOpe _ = bindOpe 
 
 normalise :: (SingContext ctx) => Expr ctx ty -> NormalForm ctx ty
 normalise = reify . eval initialEnv
@@ -181,23 +173,22 @@ elemToIndex (Tail n) = 1 + elemToIndex n
 
 --- Singletons
 
-data STy :: Ty -> * where
-    SBaseTy :: STy BaseTy
-    SArrow  :: (SingTy a, SingTy b) => STy a -> STy b -> STy (a :-> b)
-
-class SingTy a where
-    singTy :: STy a 
+class SingTy ty where
+    evalVar :: (SingContext ctx) => NeutralForm ctx ty -> V ctx ty
 
 instance SingTy 'BaseTy where
-    singTy = SBaseTy
+    evalVar n = Base (NormalNeutral n)
 
-instance (SingTy a, SingTy b) => SingTy (a :-> b) where
-    singTy = SArrow singTy singTy
+instance (SingTy arg, SingTy result) => SingTy (arg :-> result) where
+    evalVar (n :: NeutralForm ctx (arg :-> result)) = Function f 
+        where
+            f :: (SingContext ctx') => OPE ctx' ctx -> V ctx' arg -> V ctx' result
+            f ope v = evalVar (NeutralApp (strengthenNeutral ope n) (reify v)) 
 
 class SingContext ctx where
     idOpe :: OPE ctx ctx
-    wk :: OPE (x:ctx) ctx
-    wk = Drop idOpe
+    bindOpe :: OPE (x:ctx) ctx
+    bindOpe = Drop idOpe
     initialEnv :: Env ctx ctx
 
 instance SingContext '[] where
@@ -206,10 +197,8 @@ instance SingContext '[] where
 
 instance (SingContext xs, SingTy x) => SingContext (x:xs) where
     idOpe = Keep idOpe
-    initialEnv = ConsEnv (strengthenEnv wk initialEnv) (evalNeutral (NeutralVar Head))
-    -- Q: Disadvantage of moving complexity into class definition
-    -- Q: Is the alternative of pattern matching on singleton (ie evalNeutral) equivalent?
-
+    initialEnv = ConsEnv (strengthenEnv bindOpe initialEnv) (evalVar (NeutralVar Head))
+    
 --- Combinators
 
 identity :: (SingTy a) => Expr ctx (a :-> a)
@@ -223,12 +212,3 @@ true = Lam (Lam (Var (Tail Head)))
 
 false :: Expr ctx ('BaseTy :-> 'BaseTy :-> 'BaseTy)
 false = Lam (Lam (Var Head))
-
-{-
-
-TODO
-
-- Break into multiple files
-- Remove constraints on functions/GADTS/singletons and see what breaks
-
--}
