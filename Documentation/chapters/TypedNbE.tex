@@ -168,8 +168,8 @@ Intuitively if \code{ty} is an element of the context \code{weak}, then it is al
 
     strengthenNeutral :: OPE strong weak -> NeutralExpr weak ty -> NeutralExpr strong ty
     strengthenNeutral ope (NeutralVar n)   = NeutralVar (strengthenElem ope n)
-    strengthenNeutral ope (NeutralApp f a) = NeutralApp (strengthenNeutral ope f) 
-                                                        (strengthenNormal ope a) 
+    strengthenNeutral ope (NeutralApp f n) = NeutralApp (strengthenNeutral ope f) 
+                                                        (strengthenNormal ope n) 
 
 \end{lstlisting}
 
@@ -281,9 +281,9 @@ The class instances essentially form a map from types to implementations of \cod
 We are now ready to define the application case of the \code{eval} function
 
 \begin{lstlisting}
-    eval env (App f a) = appV (eval env f) (eval env a) 
+    eval env (App f n) = appV (eval env f) (eval env n) 
         where
-            appV (Function f') a' = f' (idOPEFromEnv env) a'
+            appV (Function f') n' = f' (idOPEFromEnv env) n'
 
             idOPEFromEnv :: (SingContext ctxV) => Env ctx ctxV -> OPE ctxV ctxV
             idOPEFromEnv _ = idOpe 
@@ -306,63 +306,85 @@ Since it is guaranteed by the \code{Expr} GADT that \code{f} has a function type
 
 \section{Reification}
 
+In this section we implement the \code{reify} function, which takes elements of the semantic set to their canonical well-typed normal forms. 
+
 \begin{lstlisting}
-    reify :: V ctx ty -> NormalExpr ctx ty
-    reify (Base nf)    = nf
-    reify (Function f) = NormalLam (reify (f ope (evalNeutral (NeutralVar Head)))) 
-        where
-            ope = weakenContext (Function f)
-
-            weakenContext :: (SingContext ctx) => V ctx ty -> OPE (x:ctx) ctx
-            weakenContext _ = wk 
-
-    evalNeutral :: (SingTy ty, SingContext ctx) => NeutralExpr ctx ty -> V ctx ty
-    evalNeutral = evalNeutral' singTy
-
-    evalNeutral' :: (SingContext ctx) => STy ty -> NeutralExpr ctx ty -> V ctx ty
-    evalNeutral' SBaseTy       n                                       = Base (NormalNeutral n)  
-    evalNeutral' (SArrow _ _)  (n :: NeutralExpr ctx (arg :-> result)) = Function f 
-        where
-            f :: (SingContext strongerCtx) => OPE strongerCtx ctx -> V strongerCtx arg -> V strongerCtx result
-            f ope v = evalNeutral (NeutralApp (strengthenNeutral ope n) (reify v))
+    reify :: V ctx ty -> NormalForm ctx ty
+    reify (Base nf) = nf
 \end{lstlisting}
 
-% TODO: Motivate evalNeutral and rename, contrast with standard eval
+Since semantic values with type \code{BaseTy} are normal forms, \code{reify} returns the corresponding normal form \code{nf}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{./images/agda_eval_var.png}
+    \caption{Agda implementation of \code{evalVar} from \cite{AgdaNbe}}
+    \label{fig:agdaEvalVar}
+\end{figure}
+
+In the \code{Function} case we first need a way of evaluating variables into the semantic set according to the Agda definition in figure \ref{fig:agdaEvalVar}, where we use \code{evalVar} for $\text{u}^\text{N}$ and \code{reify} for $\text{q}^\text{N}$. $\text{u}^\text{N}$ pattern matches on the type \code{A} at the type-level. Since this is not possible directly in Haskell, we use the same class instance trick from the application case of \code{eval}. 
 
 \begin{lstlisting}
-    data STy :: Ty -> * where
-        SBaseTy :: STy BaseTy
-        SArrow  :: (SingTy a, SingTy b) => STy a -> STy b -> STy (a :-> b)
-
-    class SingTy a where
-        singTy :: STy a 
+    class SingTy ty where
+        evalVar :: NeutralForm ctx ty -> V ctx ty
 
     instance SingTy 'BaseTy where
-        singTy = SBaseTy
+        evalVar n = Base (NormalNeutral n)
 
-    instance (SingTy a, SingTy b) => SingTy (a :-> b) where
-        singTy = SArrow singTy singTy
+    instance (SingTy result) => SingTy (arg :-> result) where
+        evalVar (n :: NeutralForm ctx (arg :-> result)) = Function f 
+            where
+                f :: OPE ctx' ctx -> V ctx' arg -> V ctx' result
+                f ope v = evalVar (NeutralApp (strengthenNeutral ope n) (reify v))  
 \end{lstlisting}
+
+We create a class \code{SingTy} with a single function \code{evalVar}, where the type of the neutral form is bound to the type \code{ty} parameterising the class. The \code{'BaseTy} instance is applied when the argument \code{n} is an expression of type \code{BaseTy}. In the body of the instance, GHC infers that \code{n :: NeutralForm ctx 'BaseTy}, which allows us to apply the \code{Base} constructor. The \code{:->} instance is applied when \code{n} has a function type. In this case we use type annotations again since the automatically inferred type of \code{f} is too general for successful compilation. This annotation also shows us that in the function case, GHC is able to infer that \code{n :: NeutralForm ctx (arg :-> result)}, although we manually bind the type variables. Since the \code{NeutralApp} constructor creates a neutral value of type \code{result}, we require that \code{result} also has a \code{SingTy} instance in the instance declaration.
+
+% TODO: What does evalVar do operationally?
 
 \begin{lstlisting}
     class SingContext ctx where
         idOpe :: OPE ctx ctx
-        wk :: OPE (x:ctx) ctx
-        wk = Drop idOpe
+        bindOpe :: OPE (arg:ctx) ctx
+        bindOpe = Drop idOpe
 \end{lstlisting}
+
+We extend the existing class \code{SingContext} to include \code{bindOpe}, which produces an \code{OPE} from a given context \code{ctx} to one where we have bound a new variable \code{arg:ctx}. Since \code{bindOpe} is defined the same way in both the \code{Empty} and \code{(:)} cases, we set a default implementation in the class definition and leave the individual instances unaltered. 
+
+\begin{lstlisting}
+    reify (Function f) = NormalLam (reify (f extendedOpe boundVar)) 
+        where
+            boundVar = evalVar (NeutralVar Head)
+
+            extendedOpe = extendOpe (Function f)
+
+            extendOpe :: (SingContext ctx) => V ctx ty -> OPE (arg:ctx) ctx
+            extendOpe _ = bindOpe 
+\end{lstlisting}
+
+To reify a function \code{f}, we evaluate the \code{f} at a bound variable. 
+
+% TODO: Finish above
+
+% Q: Figure out pushing type parameters around
+% TODO: Motivate evalNeutral and rename, contrast with standard eval
 
 \section{Normalisation}
 
-\begin{lstlisting}
-    normalise :: (SingContext ctx) => Expr ctx ty -> NormalExpr ctx ty
-    normalise = reify . eval initialEnv
-\end{lstlisting}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth]{./images/agda_initial_env.png}
+    \caption{Agda implementation of \code{initialEnv} from \cite{AgdaNbe}}
+    \label{fig:agdaInitialEnv}
+\end{figure}
+
+Before we define \code{normalise}, we need to specify the initial environment to evaluate our expression in. We want \code{normalise} to return a normal form with the same context as the original term. Since \code{eval :: Env ctx ctxV -> Expr ctx ty -> V ctxV ty} and \code{reify :: V ctxV ty -> NormalForm ctxV ty}, we can achieve this by evaluating with an environment of type \code{Env ctx ctx}. The initial environment is a function of the context of the given expression, as seen in Figure \ref{fig:agdaInitialEnv}.
 
 \begin{lstlisting}
     class SingContext ctx where
         idOpe :: OPE ctx ctx
-        wk :: OPE (x:ctx) ctx
-        wk = Drop idOpe
+        bindOpe :: OPE (x:ctx) ctx
+        bindOpe = Drop idOpe
         initialEnv :: Env ctx ctx
 
     instance SingContext '[] where
@@ -371,32 +393,57 @@ Since it is guaranteed by the \code{Expr} GADT that \code{f} has a function type
 
     instance (SingContext xs, SingTy x) => SingContext (x:xs) where
         idOpe = Keep idOpe
-        initialEnv = ConsEnv (strengthenEnv wk initialEnv) (evalNeutral (NeutralVar Head))
+        initialEnv = ConsEnv (strengthenEnv bindOpe initialEnv) (evalVar (NeutralVar Head))
 \end{lstlisting}
 
-\section{For presentation}
+We emulate the type-level pattern match by further extending the \code{SingContext} class with the \code{initialEnv} function. 
+For each element in the context, we add a new semantic variable to the environment, strengthening the contexts of all the semantic elements in the environment accordingly using \code{strengthenEnv bindOpe}. This allows us to normalise expressions with free variables where the type of each free variable is given in the context. \code{evalVar} requires that \code{x} has a \code{SingTy} instance, so we implicitly pass this guarantee by adding a \code{SingTy} constraint to the instance. 
+
+Grouping functions under a single type class like this could be problematic for more complicated applications, as it may lead to an accumulation of class constraints. For example, consider the following \code{hypothetical} function.
 
 \begin{lstlisting}
-    evalNeutral :: (SingTy ty) => NeutralExpr ctx ty -> V ctx ty
-    evalNeutral = evalNeutral' singTy
-
-    evalNeutral' :: STy ty -> NeutralExpr ctx ty -> V ctx ty
-    evalNeutral' SBaseTy      n = ...
-    evalNeutral' (SArrow _ _) n = ...
-
-    evalNeutral :: STy ty -> NeutralExpr ctx ty -> V ctx ty
-    evalNeutral SBaseTy      n = ...
-    evalNeutral (SArrow _ _) n = ...
-
-    eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
-        where
-            f :: OPE ctxV' ctxV -> V ctxV' arg -> V ctxV' result
-            f ope v = ...
-
-    eval env (Lam body) = Function f 
-        where
-            f ope v = ...
+    hypothetical :: (SingContext ctx) => Expr ctx ty -> OPE (ty:ctx) (ty:ctx)
+    hypothetical _ = idOpe
 \end{lstlisting}
+
+Even through \code{idOpe} only depends on the length of a context rather than its contents, to use the \code{idOpe} implementation for \code{ty:ctx}, the \code{(:)} instance for \code{SingContext} requires that \code{ty} is a member of \code{SingTy}. Thus, \code{hypothetical} does not type-check and compilation fails. In cases like these it would be necessary to split the type-level pattern-matching functions across distinct classes, to avoid the accumulation of constraints on a single class instance. This could lead to significant amounts of boilerplate in applications using classes for type-level pattern matching more frequently. In our implementation, adding this constraint does not prevent other functions from type-checking. 
+
+\begin{lstlisting}
+    normalise :: (SingContext ctx) => Expr ctx ty -> NormalExpr ctx ty
+    normalise = reify . eval initialEnv
+\end{lstlisting}
+
+The type signature of \code{normalise} is the motivation for all the additional type-level restrictions in this implementation. Given a well-typed expression, \code{normalise} is guaranteed by the type system to return a well-typed normal form with the same context and type as the original expression. The type information in our implementation acts as a proof of this property, which is verified at compile time by the type-checker.
+
+To normalise an expression, the user must specify a concrete context and type for the expression using type annotations. This instantiates type variables which enables polymorphic functions to resolve to specific instances. For example,
+
+\begin{lstlisting}
+    normalise (Lam (Var Head) :: Expr '[] (BaseTy :-> BaseTy)) 
+        = Lam (Var 0)
+\end{lstlisting}
+
+whereas
+
+\begin{lstlisting}
+    normalise (Lam (Var Head) :: Expr '[] ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy))
+        = Lam (Lam (App (Var 1) (Var 0)))
+\end{lstlisting}
+
+where the returned terms are expressed in de Bruijn syntax for brevity.
+
+This implementation returns expressions in $\eta$-expaned form as well as $\beta$-normal form, so different type annotations can lead to different terms even if the syntax is the same. 
+
+Below we attempt to normalise a term with a polymorphic type signature.
+
+\begin{lstlisting}
+    normalise (Lam (Var Head) :: Expr '[] (a :-> a))
+\end{lstlisting}
+
+However, this expression cannot be normalised and GHC produces an error since \code{a} is a type variable. Without a concrete type, GHC is unable to resolve instances of polymorphic functions such as \code{evalVar} at runtime.
+
+Whilst it is guaranteed that the returned expression of \code{normalise} is normal form, it is not guaranteed that it is the correct normal form for the given expression. Andras Kovacs goes further and formulates a mahine-checked proof of correctness for his implementation of NbE in Agda \cite{AgdaNbe}, and for further work it would be interesting to see if this too can be translated into Haskell.
+
+% TODO: Move above to evaluation/conclusion
 
 \section{Notes}
 
