@@ -10,7 +10,7 @@
     \label{fig:nbeOverview}
 \end{figure}
 
-NbE proceeds in two steps. The first is to evaluate terms in the lambda calculus into a semantic set. In \ref{fig:nbeOverview} terms are represented by dots in the syntax set and the evaluation function is denoted by $\llbracket - \rrbracket$, which we refer to as \code{eval}. The second step is to \code{reify} the semantic value back into the normal form of the original term. Thus, the \code{normalise} function which maps terms to their normal forms is the composition of \code{eval} and \code{reify}
+NbE proceeds in two steps. The first is to evaluate terms of the lambda calculus into a semantic set. In \ref{fig:nbeOverview} terms are represented by dots in the syntax set and the evaluation function is denoted by $\llbracket - \rrbracket$, which we refer to as \code{eval}. The second step is to \code{reify} the semantic value back into the normal form of the original term. Thus, the composition of \code{eval} and \code{reify} yields the \code{normalise} function which maps terms to their normal forms. 
 
 % property of eval
 \ref{fig:nbeOverview} illustrates why NbE works. The key property of the \code{eval} function is that $\beta$-equal terms (represented by dots of the same colour in the syntax set) evaluate to the same semantic value. This ensures that $\beta$-equal terms normalise to the same normal form. The key property of the \code{reify} function is that the codomain of \code{reify} is the subset of normal forms, so \code{normalise} is guaranteed to return a normal form. 
