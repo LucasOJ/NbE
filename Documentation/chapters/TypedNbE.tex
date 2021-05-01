@@ -108,13 +108,13 @@ As in the untyped implementation of NbE, during evaluation we need an environmen
         ConsEnv  :: Env ctx ctxV -> V ctxV ty -> Env (ty : ctx) ctxV
 \end{lstlisting}
 
-From the constructors, we see that the \code{Env} GADT has the same value-level structure as the standard Haskell list. However, we have used GADT syntax to enforce additional restrictions on the types of the elements in the environment. From the kind signature, we see that \code{Env} is indexed by two typing contexts. From the constructor types, we see that the first of these tracks the types of the semantic elements stored in the environment. The second typing context is the typing context shared by all semantic values stored in the environment. The motivation for indexing \code{Env} by these typing contexts is due to \code{envLookup} function defined below in \ref{subsect:typedVarCase}.
+From the constructors, we see that the \code{Env} GADT has the same value-level structure as the standard Haskell list. However, we have used GADT syntax to enforce additional restrictions on the types of the elements in the environment. From the kind signature, we see that \code{Env} is indexed by two typing contexts. From the constructor types, we see that the first of these tracks the types of the semantic elements stored in the environment. The second typing context is the typing context shared by all semantic values stored in the environment. The motivation for indexing \code{Env} by these typing contexts is due to \code{envLookup} function defined below in \ref{subsect:typedetaExpandCase}.
 
 
 % Why do ctxs have to match?
 
 \subsection{Variable Case}
-\label{subsect:typedVarCase}
+\label{subsect:typedetaExpandCase}
 
 Now that we have defined the environment, we can begin implementing the evaluation function \code{eval}.
 
@@ -243,6 +243,7 @@ As in the \code{Function} case of \code{strengthenV}, the type of \code{f} that 
 Once we have annotated the argument types, type-checking and compilation succeed.
 
 \subsection{Application Case}
+\label{subsect:typedEvalAppCase}
 
 \begin{figure}[h]
     \centering
@@ -317,30 +318,30 @@ Since semantic values with type \code{BaseTy} are normal forms, \code{reify} ret
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.7\textwidth]{./images/agda_eval_var.png}
-    \caption{Agda implementation of \code{evalVar} from \cite{AgdaNbe}}
-    \label{fig:agdaEvalVar}
+    \includegraphics[width=0.7\textwidth]{./images/agda_eta_expand.png}
+    \caption{Agda implementation of \code{etaExpand} from \cite{AgdaNbe}}
+    \label{fig:agdaEtaExpand}
 \end{figure}
 
-In the \code{Function} case we first need a way of evaluating variables into the semantic set according to the Agda definition in figure \ref{fig:agdaEvalVar}, where we use \code{evalVar} for $\text{u}^\text{N}$ and \code{reify} for $\text{q}^\text{N}$. $\text{u}^\text{N}$ pattern matches on the type \code{A} at the type-level. Since this is not possible directly in Haskell, we use the same class instance trick from the application case of \code{eval}. 
+It would be desirable to normalise expressions into $\eta$-expanded normal form, where all the arguments of expressions with function type are abstracted. \code{etaExpand} is the function responsible for evaluating syntactic expressions into $\eta$-expanded semantic expressions. To implement \code{etaExpand} we follow the Agda definition in figure \ref{fig:agdaEtaExpand}, where we use \code{etaExpand} for $\text{u}^\text{N}$ and \code{reify} for $\text{q}^\text{N}$. $\text{u}^\text{N}$ pattern matches on the type \code{A} at the type-level. Since this is not possible directly in Haskell, we use the same class instance trick from the application case of \code{eval}. 
 
 \begin{lstlisting}
     class SingTy ty where
-        evalVar :: NeutralForm ctx ty -> V ctx ty
+        etaExpand :: NeutralForm ctx ty -> V ctx ty
 
     instance SingTy 'BaseTy where
-        evalVar n = Base (NormalNeutral n)
+        etaExpand n = Base (NormalNeutral n)
 
     instance (SingTy result) => SingTy (arg :-> result) where
-        evalVar (n :: NeutralForm ctx (arg :-> result)) = Function f 
+        etaExpand (n :: NeutralForm ctx (arg :-> result)) = Function f 
             where
                 f :: OPE ctx' ctx -> V ctx' arg -> V ctx' result
-                f ope v = evalVar (NeutralApp (strengthenNeutral ope n) (reify v))  
+                f ope v = etaExpand (NeutralApp (strengthenNeutral ope n) (reify v))  
 \end{lstlisting}
 
-We create a class \code{SingTy} with a single function \code{evalVar}, where the type of the neutral form is bound to the type \code{ty} parameterising the class. The \code{'BaseTy} instance is applied when the argument \code{n} is an expression of type \code{BaseTy}. In the body of the instance, GHC infers that \code{n :: NeutralForm ctx 'BaseTy}, which allows us to apply the \code{Base} constructor. The \code{:->} instance is applied when \code{n} has a function type. In this case we use type annotations again since the automatically inferred type of \code{f} is too general for successful compilation. This annotation also shows us that in the function case, GHC is able to infer that \code{n :: NeutralForm ctx (arg :-> result)}, although we manually bind the type variables. Since the \code{NeutralApp} constructor creates a neutral value of type \code{result}, we require that \code{result} also has a \code{SingTy} instance in the instance declaration.
+We create a class \code{SingTy} with a single function \code{etaExpand}, where the type of the neutral form is bound to the type \code{ty} parameterising the class. The \code{'BaseTy} instance is applied when the argument \code{n} is an expression of type \code{BaseTy}. In the body of the instance, GHC infers that \code{n :: NeutralForm ctx 'BaseTy}, which allows us to apply the \code{Base} constructor. The \code{:->} instance is applied when \code{n} has a function type. In this case we use type annotations again since the automatically inferred type of \code{f} is too general for successful compilation. This annotation also shows us that in the function case, GHC is able to infer that \code{n :: NeutralForm ctx (arg :-> result)}. In the this instance, \code{etaExpand} returns a function, which will eventually be reified into a lambda. However, the body of this function may itself may require $\eta$-expansion, depending on the type of the argument \code{v}. Since the \code{NeutralApp} constructor creates a neutral value of type \code{result}, we require that \code{result} also has a \code{SingTy} instance in the instance declaration.
 
-% TODO: What does evalVar do operationally?
+In the untyped implementation of NbE, evaluation and reification take place in two distinct phases. In contrast, from the definition of \code{etaExpand} we see that in the typed implementation, expressions are bounced back and forth between syntactic and semantic representations. This makes the implementation more difficult to reason about, but is a necessary trade-off to achieve the additional type security and features such as $\eta$-expansion that the typed implementation provides.
 
 \begin{lstlisting}
     class SingContext ctx where
@@ -354,7 +355,7 @@ We extend the existing class \code{SingContext} to include \code{bindOpe}, which
 \begin{lstlisting}
     reify (Function f) = NormalLam (reify (f extendedOpe boundVar)) 
         where
-            boundVar = evalVar (NeutralVar Head)
+            boundVar = etaExpand (NeutralVar Head)
 
             extendedOpe = extendOpe (Function f)
 
@@ -362,7 +363,9 @@ We extend the existing class \code{SingContext} to include \code{bindOpe}, which
             extendOpe _ = bindOpe 
 \end{lstlisting}
 
-To reify a function \code{f}, we evaluate the \code{f} at a bound variable. 
+To reify a function \code{f :: OPE ctx' ctx -> V ctx' arg -> V ctx' result}, we evaluate the \code{f} at a semantic bound variable, and reify the result representing the body of the function \code{f}. \code{boundVar} has the type \code{V (arg:ctx) arg}, so we use the \code{extendedOpe} function to produce an \code{OPE} for a context where we have bound an additional variable of type \code{arg}. All instances of the argument in the body of \code{f} are replaced with \code{etaExpand (NeutralVar Head)}. From the definition of \code{etaExpand}, we see that if \code{NeutralVar Head} has type \code{BaseTy}, \code{etaExpand} can immediately evaluate the variable into the semantic set. On the other hand, if \code{NeutralVar Head} has a function type, \code{etaExpand} evaluates to a function which waits for an argument to be given before continuing evaluation.
+
+The other section of the program where we evaluate a semantic function \code{f} is the application case of \code{eval} (see Section \ref{subsect:typedEvalAppCase}). These cases motivate the use of \code{OPE}s, since in the application case we need to evaluate \code{f} in the same context as the semantic value, whereas in this case we need to evaluate \code{f} in an extended context where an additional bound variable is introduced. Whilst \code{OPE}s are responsible for a significant amount of the additional work in implementing well-typed normaliation, they are an elegant solution to evaluating semantic functions in different contexts.
 
 % TODO: Finish above
 
@@ -393,11 +396,11 @@ Before we define \code{normalise}, we need to specify the initial environment to
 
     instance (SingContext xs, SingTy x) => SingContext (x:xs) where
         idOpe = Keep idOpe
-        initialEnv = ConsEnv (strengthenEnv bindOpe initialEnv) (evalVar (NeutralVar Head))
+        initialEnv = ConsEnv (strengthenEnv bindOpe initialEnv) (etaExpand (NeutralVar Head))
 \end{lstlisting}
 
 We emulate the type-level pattern match by further extending the \code{SingContext} class with the \code{initialEnv} function. 
-For each element in the context, we add a new semantic variable to the environment, strengthening the contexts of all the semantic elements in the environment accordingly using \code{strengthenEnv bindOpe}. This allows us to normalise expressions with free variables where the type of each free variable is given in the context. \code{evalVar} requires that \code{x} has a \code{SingTy} instance, so we implicitly pass this guarantee by adding a \code{SingTy} constraint to the instance. 
+For each element in the context, we add a new semantic variable to the environment, strengthening the contexts of all the semantic elements in the environment accordingly using \code{strengthenEnv bindOpe}. This allows us to normalise expressions with free variables where the type of each free variable is given in the context. \code{etaExpand} requires that \code{x} has a \code{SingTy} instance, so we implicitly pass this guarantee by adding a \code{SingTy} constraint to the instance. 
 
 Grouping functions under a single type class like this could be problematic for more complicated applications, as it may lead to an accumulation of class constraints. For example, consider the following \code{hypothetical} function.
 
@@ -439,7 +442,7 @@ Below we attempt to normalise a term with a polymorphic type signature.
     normalise (Lam (Var Head) :: Expr '[] (a :-> a))
 \end{lstlisting}
 
-However, this expression cannot be normalised and GHC produces an error since \code{a} is a type variable. Without a concrete type, GHC is unable to resolve instances of polymorphic functions such as \code{evalVar} at runtime.
+However, this expression cannot be normalised and GHC produces an error since \code{a} is a type variable. Without a concrete type, GHC is unable to resolve instances of polymorphic functions such as \code{etaExpand} at runtime.
 
 Whilst it is guaranteed that the returned expression of \code{normalise} is normal form, it is not guaranteed that it is the correct normal form for the given expression. Andras Kovacs goes further and formulates a mahine-checked proof of correctness for his implementation of NbE in Agda \cite{AgdaNbe}, and for further work it would be interesting to see if this too can be translated into Haskell.
 

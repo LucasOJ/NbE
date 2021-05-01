@@ -144,7 +144,7 @@ reify :: V ctx ty -> NormalForm ctx ty
 reify (Base nf)    = nf
 reify (Function f) = NormalLam (reify (f extendedOpe boundVar)) 
     where
-        boundVar = evalVar (NeutralVar Head)
+        boundVar = etaExpand (NeutralVar Head)
 
         extendedOpe = extendOpe (Function f)
 
@@ -174,16 +174,16 @@ elemToIndex (Tail n) = 1 + elemToIndex n
 --- Singletons
 
 class SingTy ty where
-    evalVar :: (SingContext ctx) => NeutralForm ctx ty -> V ctx ty
+    etaExpand :: (SingContext ctx) => NeutralForm ctx ty -> V ctx ty
 
 instance SingTy 'BaseTy where
-    evalVar n = Base (NormalNeutral n)
+    etaExpand n = Base (NormalNeutral n)
 
 instance (SingTy arg, SingTy result) => SingTy (arg :-> result) where
-    evalVar (n :: NeutralForm ctx (arg :-> result)) = Function f 
+    etaExpand (n :: NeutralForm ctx (arg :-> result)) = Function f 
         where
             f :: (SingContext ctx') => OPE ctx' ctx -> V ctx' arg -> V ctx' result
-            f ope v = evalVar (NeutralApp (strengthenNeutral ope n) (reify v)) 
+            f ope v = etaExpand (NeutralApp (strengthenNeutral ope n) (reify v)) 
 
 class SingContext ctx where
     idOpe :: OPE ctx ctx
@@ -197,7 +197,7 @@ instance SingContext '[] where
 
 instance (SingContext xs, SingTy x) => SingContext (x:xs) where
     idOpe = Keep idOpe
-    initialEnv = ConsEnv (strengthenEnv bindOpe initialEnv) (evalVar (NeutralVar Head))
+    initialEnv = ConsEnv (strengthenEnv bindOpe initialEnv) (etaExpand (NeutralVar Head))
     
 --- Combinators
 
