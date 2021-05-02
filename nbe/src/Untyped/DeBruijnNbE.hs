@@ -1,7 +1,7 @@
 
 module Untyped.DeBruijnNbE (normaliseDbExpr) where 
 import Prelude hiding ( lookup, empty )
-import Data.Map (  insert, Map, mapKeys, lookup)
+import Data.Map (  insert, Map, mapKeys, lookup, size)
 import qualified Data.Map as Map ( fromList, empty )
 import Control.Monad.State ( MonadState(get), State, modify, evalState )
 import Data.Set ( Set, singleton, delete, union, notMember, toList )
@@ -23,7 +23,8 @@ data NeutralForm = NeVar Int
 data V = Neutral NeutralV
        | Function (V -> V)
 
-data NeutralV = NeVLevel Int
+data NeutralV = NeVFreeVar Int
+              | NeVBoundVar Int
               | NeVApp NeutralV V
 
 -- Environment
@@ -39,7 +40,7 @@ eval env (DbVar x) = case lookup x env of
 
         -- Free variable, embed into semantics as is
         -- TODO: What to do with free variables?
-        Nothing -> Neutral (NeVLevel (length env - 1 - x))
+        Nothing -> Neutral (NeVFreeVar (x - size env))
 
 eval env (DbLam m) = Function f where
         f :: V -> V
@@ -61,14 +62,15 @@ app (Neutral m)  v = Neutral (NeVApp m v)
 reify :: Int -> V -> NormalForm
 -- Reifies a function by evaluating the function at the nth dB level
 -- We increment by 1 since n represents the maximum number of free variables (we have introduced a new one)
-reify n (Function f) = NfLam (reify (n + 1) (f (Neutral (NeVLevel n))))
+reify n (Function f) = NfLam (reify (n + 1) (f (Neutral (NeVBoundVar n))))
 reify n (Neutral m)  = NfNeutralForm (reifyNeutral n m)
     where
         -- Converts a sematic neutral into its associated sytactic neutral form
         reifyNeutral :: Int -> NeutralV -> NeutralForm
         -- Converts a semantic deBruijn level into a sytactic deBruijn variable
-        reifyNeutral n (NeVLevel k) = NeVar (n - 1 - k)
-        reifyNeutral n (NeVApp p q) = NeApp (reifyNeutral n p) (reify n q)
+        reifyNeutral n (NeVFreeVar k)  = NeVar (n + k)
+        reifyNeutral n (NeVBoundVar k) = NeVar (n - 1 - k)
+        reifyNeutral n (NeVApp p q)    = NeApp (reifyNeutral n p) (reify n q)
 
 ---- Conversion back to standard deBruijn term
 
@@ -84,18 +86,18 @@ neutralToExp (NeApp n m) = DbApp (neutralToExp n) (normalToExpr m)
 
 ---- Normalisation functions  
 
+normalise :: DbExpr -> NormalForm
+normalise = reify 0 . eval initialEnv where
+    initialEnv = Map.empty 
+
 -- Normalises a deBruijn expression given that it contains n free variables
 normaliseDbExpr :: DbExpr -> DbExpr
-normaliseDbExpr = normalToExpr . reify 0 . eval initialEnv where
-    -- The first n deBruijn indicies correspond to the free variables
-    -- Their semantic representation is the final n deBruijn levels 
-    -- initialEnv = Map.fromList [(k, Neutral (NeVLevel (n - 1 - k))) | k <-[0..(n - 1)]] 
-    initialEnv = Map.empty 
+normaliseDbExpr = normalToExpr . normalise
 
 -- Main NbE Function
 -- Given a string-named expression, produces the string named normal form
-normalise :: Expr -> Expr
-normalise expr = (deBruijnExprToExpr indexToName freshVariableStream 
+normaliseExpr :: Expr -> Expr
+normaliseExpr expr = (deBruijnExprToExpr indexToName freshVariableStream 
                   . normaliseDbExpr 
                   . exprToDeBruijnExpr nameToIndex) expr where
 

@@ -17,7 +17,9 @@ NbE proceeds in two steps. The first is to evaluate terms of the lambda calculus
 
 The remainder of this chapter defines the data NbE operates on and functions to perform NbE in Haskell.
 
-\section{Syntax}
+\section{Gensym NbE}
+
+\subsection{Syntax}
 
 \begin{lstlisting}
     type Name = String
@@ -39,7 +41,7 @@ Inhabitants of the inductively-defined datatype \code{Expr} are well-formed term
 
 We now define the target syntax of the \code{normalise} function, \code{NormalForm}. Note that \code{NormalForm} is inhabited by all the terms not containing $\beta$-redexes \cite{slides}, since the definition of \code{NeApp} only permits application on non-lambda terms, which are encoded as values of type \code{NeutralForm}.
 
-\section{Semantics}
+\subsection{Semantics}
 
 \begin{lstlisting}
     data V = Neutral NeutralV
@@ -57,7 +59,7 @@ The similarity simplifies \code{reify} as for some terms there are obvious trans
 
 % TODO: Discuss using why don't use Neutral Form but establish our own datatype
 
-\section{Evaluation}
+\subsection{Evaluation}
 
 Evaluation proceeds by pattern matching on the given term, and evaluating its constituent subterms. However, the semantic meaning of subterms can differ depending on which variables are bound by which lambda term. For example, in the terms $\lambda x . \lambda y . xy$ and $\lambda y . xy$, the semantic meaning of the $xy$ subterm is different. Thus, in addition to the term itself, \code{eval} needs information about the bound variables introduced by surrounding lambda terms. 
 
@@ -112,7 +114,7 @@ In the case where the first value is a function \code{f}, we evaluate \code{f} a
 % TODO: Explain more
 In the case that the first value is a value \code{n} of type \code{NeutralV}, there is no redex to contract, so we return a placeholder Neutral application at the semantic level.
 
-\section{Gensym Reification}
+\subsection{Reification}
 
 % TODO: Cite name, in de Bruijn paper
 
@@ -162,6 +164,8 @@ For example, in the neutral term $(y(\lambda x.x))(\lambda x . x)$ there is no i
 
 The reification of an abstract semantic function \code{f} produces a concrete syntactic description for \code{f}. \code{reify} abstracts out the argument of \code{f} into a syntactic variable \code{v} with a lambda expression. In the body of \code{f}, we replace the abstract argument with the variable \code{v} by applying \code{f} to \code{Neutral (NeVVar v)}. This value has type \code{V}, so we can \code{reify} it to produce a syntactic representation for the body of \code{f}, which completes the term. We \code{reify} the term with the stream of fresh variables \code{vs}, since the variable name \code{v} is bound in the body of the lambda, so is no longer fresh.
 
+\subsection{Normalisation}
+
 Using the implementations of \code{eval} and \code{reify}, we can define the \code{normalise} function as follows.
 
 \begin{lstlisting}
@@ -174,7 +178,6 @@ Using the implementations of \code{eval} and \code{reify}, we can define the \co
 \code{normalise} takes an expression, and returns its normal form. Since \code{normalise} returns a value of type \code{NormalForm} it is guaranteed that the returned expression is normal. First we evaluate the given expression in the empty environment, since no variables are bound to begin with. Then we reify the returned semantic value of type \code{V} back into a concrete \code{NormalForm} term. 
 
 Some terms such as $(\lambda x.x x)(\lambda x.x x)$ do not have a normal form. However, the \code{normalise} type signature guarantees that all expressions can be normalised to a normal form. The resolution to this paradox is that in cases where terms do not have a normal form, \code{normalise} will not terminate so will never produce a normal form. In particular, such expressions do not have a representation in the semantic state, so \code{eval} never terminates. For example, when evaluating $(\lambda x.x x)(\lambda x.x x)$, \code{eval} reaches a stage where it must evaluate the Haskell application \code{(\v -> app v v) (\v -> app v v)}. Following the definition of \code{app}, we find that this evaluates to the same expression, and thus will never finish evaluating. This is similar to the corresponding $\beta$-reduction, where $(\lambda x.x x)(\lambda x.x x) \rightarrow_\beta (\lambda x.x x)(\lambda x.x x)$, except that in NbE this infinte contraction happens in the semantics.
-
 
 We produce a stream of valid fresh variable names \code{freshVars} of type \code{[Name]} for the given expression using the following functions.
 
@@ -193,11 +196,15 @@ We produce a stream of valid fresh variable names \code{freshVars} of type \code
 
 \code{getFreeVariables} takes an expression and returns the set of free variable names. \code{getFreshVariableStream} takes the set of free variable names and returns a stream of fresh variable names, since each of the names are distinct from each other and the free variables.
 
-While this approach works, generating fresh variables is a fragile procedure. The correctness of the algorithm depends on it, however \code{getFreeVariables} does not have the same type guarantees as the rest of the implementation, so mistakes would be easy to make and difficult to notice. Another drawback of the Gensym approach is that \code{reify} is indexed by an infinite stream of variable names, which is difficult to reason about. This is not a functional approach since we essentially use this parameter as state storage. 
-
 \section{de Bruijn NbE}
 
-One approach to resolve the fresh variable problem is to remove variable names from the syntax altogether, and use an alternative, unnamed, representation of lambda calculus terms. In general, a variable can be thought of as a pointer to the lambda that binds it. Named terms do this by labelling lambdas and referencing them in variables using their names. de Bruijn terms take a different approach which we describe below, but fundamentally both approaches serve the same purpose, so represent the same set of terms.
+\subsection{Motivation}
+
+While the Gensym approach works, generating fresh variables is a fragile procedure. The correctness of \code{normalise} depends on it, however \code{getFreeVariables} does not have the same type guarantees as the rest of the implementation, so mistakes would be easy to make and difficult to notice. Another drawback of the Gensym approach is that \code{reify} is indexed by an infinite stream of variable names, which is difficult to reason about. This is not a functional approach since we essentially use this parameter as state storage. 
+
+One approach to resolve the fresh variable problem is to remove variable names from the syntax altogether by using an alternative, unnamed, representation of lambda calculus terms. In general, a variable can be thought of as a pointer to the lambda that binds it. Named terms do this by labelling lambdas and referencing them in variables using their names. de Bruijn terms take a different approach which we describe below, but fundamentally both approaches serve the same purpose, so represent the same set of terms.
+
+\subsection{Introduction to de Bruijn Terms}
 
 de Bruijn terms are defined as follows. \cite{deBruijnNotation}
 
@@ -207,7 +214,7 @@ de Bruijn terms are defined as follows. \cite{deBruijnNotation}
                 | DbApp DbExpr DbExpr
 \end{lstlisting}
 
-In de Bruijn terms, lambda terms are not named, as seen in the definition of \code{DbLam}. Instead, each variable refers to the lambda that binds it using a de Bruijn index: the number of lambdas between the occurrence of the variable and the lambda which binds it. If we think of the set of bound variables at each point of the term as a stack, with the most recently bound variable at the top, then the de Bruijn index of a variable is the number of bindings you have to pop from this scope stack to reach the variable.
+In de Bruijn terms, lambda terms are not named, as seen in the definition of \code{DbLam}. Instead, each variable refers to the lambda that binds it using a de Bruijn index: the number of lambdas between the occurrence of the variable and the lambda which binds it. If we think of the set of bound variables at each point of the term as a stack, with the most recently bound variable at the top, then the de Bruijn index of a variable is the number of bindings you have to pop from the scope stack to reach the variable.
 
 \begin{figure}[h]
     \centering
@@ -220,7 +227,7 @@ In de Bruijn terms, lambda terms are not named, as seen in the definition of \co
         $\lambda x. x (\lambda y. x y)$ & $\lambda . 0 (\lambda . 1 0 )$ \\
         \hline
     \end{tabular}
-    \caption{Examples of de Bruijn terms and their equaivalent named terms}
+    \caption{Examples of de Bruijn terms and their equivalent named terms}
     \label{fig:deBruijnExamples}
 \end{figure}
 
@@ -232,6 +239,10 @@ In de Bruijn terms, lambda terms are not named, as seen in the definition of \co
 
 Variables with indices greater than the number of bound lambdas are treated as free. For example, we could represent the term $y (\lambda x.xy)$ as $0 (\lambda .01)$ using de Bruijn terms. In the above term we have implicitly bound the free variable $y$ to 0 at the top level of the term. Note that we refer to $y$ using the index $1$ inside the lambda since the lambda introduces a bound variable in the context of its body. 2 $(\lambda . 0 3)$ is an equivalent term where $y$ is implicitly bound to 2 at the top level.
 
+We now roughly follow an implementation by Andreas Abel for normalising the lambda calclus with de Bruijn terms \cite{deBruijn}.
+
+\subsection{Syntax}
+
 The changes to the syntax are reflected in the definition of the de Bruijn normal and neutral terms. 
 
 \begin{lstlisting}
@@ -242,44 +253,48 @@ The changes to the syntax are reflected in the definition of the de Bruijn norma
                      | NeApp NeutralForm NormalForm
 \end{lstlisting}
 
-We also redefine the semantic set for de Bruijn terms following an implementation by Andreas Abel \cite{deBruijn}
+\subsection{Semantics}
+
+We also redefine the semantic set for de Bruijn terms.
 
 \begin{lstlisting}
     data V = Neutral NeutralV
            | Function (V -> V)
 
-    data NeutralV = NeVLevel Int
+    data NeutralV = NeVFreeVar Int
+                  | NeVBoundVar Int
                   | NeVApp NeutralV V
 \end{lstlisting}
 
+Our implementation of the syntactic set differs slightly from Abel's. Abel uses indexing tricks to differentiate between bound and free variables in the semantic set, whereas in our implementation uses distinct constructors to distinguish between them. This choice makes it easier to understand the operation of the code and avoids index manipulation errors.
+
 % TODO: De Bruijn levels not indicies - motivate with problem as indicies dependent on full term but want V to fully define 
 
-The \code{eval} function for de Bruijn terms operates similarly to the gensym evaluation function. 
+\subsection{Evaluation}
 
 \begin{lstlisting}
     type Env = Map Int V
-
-    eval :: Env -> DbExpr -> V
 \end{lstlisting}
 
 In the de Bruijn implementation, the environment maps from de Bruijn indices to the semantic set, instead of from names.
 
+The \code{eval} function for de Bruijn terms operates similarly to the gensym evaluation function
+
 \begin{lstlisting}
+    eval :: Env -> DbExpr -> V
     eval env (DbVar x) = case lookup x env of
         Just y -> y
-        Nothing -> undefined
+        Nothing -> Neutral (NeVFreeVar (x - size env))
 \end{lstlisting}
 
-In the variable case we again lookup the semantic interpretation of the given variable from the environment. In contrast to the gensym approach, we bind free variables in addition to bound variables in the context before the execution of \code{eval}. As seen in a previous example, there are many equivalent terms in the de Bruijn syntax depending on the choice of free variable indices. We make the choice explicit by binding free variables indices in the environment before the execution of \code{eval}. 
+In the variable case we lookup the semantic interpretation of bound variables from the environment. 
 
-% TODO: Why can we not bind free variable to level now?
-%   Don't know depth of term (n parameter, why not include)
+In Abel's implementation, all the free variables are also bound to semantic values in the initial environment before evaluating begins. Thus, in the \code{Nothing} case of the variable lookup, we would have to return \code{undefined}. Additionally, the algorithm is only correct if the pre-processing of the term is free from errors. Avoiding fragile pre-processing and implicit assumptions was the motivation for moving to de Bruijn notation, so we have modified Abel's implementation to improve type-safety.
 
-This introduces the possibility that eval does not terminate successfully, however in practice this case will never be evaluated 
+Instead of assuming all free variables are already bound in the environment, we generate their semantic interpretations as we evaluate the term. We start with an empty initial environment, so the \code{Nothing} case corresponds to a free variable, as it did in the untyped implementation. 
 
-% TODO: Nothing case, promote to Neutral (NeVar ??) ? 
-% No n
-% Bind in environment, introduced explicitly before evaluation
+de Bruijn indices are not suitable for indexing variables in the semantic set, as they are the dependent on the number of bindings in the context in which they occur. This context will change as redexes are contracted by \code{eval} and lambda bindings are removed. We choose a semantic representation for free variables where all occurrences of the same free variable are identified with the same semantic value.
+\code{eval} returns a semantic variable with the index of same variable at the outermost context of the term. It calculates this by subtracting the number of bindings in the current context (\code{size env}) from the syntactic index \code{x}. Thus, every occurrence of the free variable will be identified with the same semantic value, regardless of where it occurs in the term. 
 
 \begin{lstlisting}
     eval env (DbLam m) = Function f where
@@ -288,41 +303,46 @@ This introduces the possibility that eval does not terminate successfully, howev
         env' = insert 0 v (mapKeys (+1) env)
 \end{lstlisting}
 
-As in the named approach, the semantic representation chosen for functions is a Haskell function that takes a semantic value \code{v}, and returns the semantic interpretation of the lambda body with the bound variable interpreted as \code{v}. They key difference in the deBruijn case when working with de Bruijn terms is the construction of the new environment. We first increment all other indicies by 1 since we have introduced a new lambda between each variable and its associated binding. Then, to introduce the new variable bound by the lambda into the environment, we bind the 0th index to \code{v} in the shifted environment.
+As in the named approach, the semantic representation chosen for functions is a Haskell function that takes a semantic value \code{v}, and returns the semantic interpretation of the lambda body with the bound variable interpreted as \code{v}. They key difference to the untyped implementation is the construction of the new environment. We first increment all other indices by 1 since we have introduced a new lambda between each variable and its associated binding. Then, to introduce the new variable bound by the lambda into the environment, we bind the 0th index to \code{v} in the shifted environment.
 
-The application case remains exactly the same as in the gensym implementation, so the approach for contracting redexes is identical.
+The application case remains exactly the same as in the Gensym implementation since the approach for contracting redexes is identical.
+
+\subsection{Reification}
 
 \begin{lstlisting}
     reify :: Int -> V -> NormalForm
 \end{lstlisting}
 
-Reification for de Bruijn terms also follows a similar structure to the gensym approach. However, instead of taking a list 
-
+Reification for de Bruijn terms also follows a similar structure to the Gensym approach. However, instead of taking a stream of fresh variables, the de Bruijn \code{reify} function only needs the number of bound variables in the semantic value of type \code{V}. This is significantly easier to reason about and much less stateful than the Gensym \code{reify} function.
 
 \begin{lstlisting}
-    reify n (Function f) = NfLam (reify (n + 1) (f (Neutral (NeVLevel n))))
+    reify n (Function f) = NfLam (reify (n + 1) (f (Neutral (NeVBoundVar n))))
 \end{lstlisting}
+
+As in the untyped implementation, to reify a function \code{f} we return a lambda where the body of the term is the reification of \code{f} at a fresh variable. However, generating a fresh variable is much simpler than in the untyped implementation. 
+
+We use de Bruijn levels to represent bound variables in the semantic set, as Abel does in his implementation. de Bruijn Levels work in the opposite way to indices: the de Bruijn level 0 corresponds to the oldest bound variable in scope, rather than the newest. 
+
+Since \code{n} variables are bound in \code{f}, the de Bruijn levels which have already been bound are $0, 1, \dots, n - 1$. Thus, \code{NeVBoundVar n} is a fresh variable. Since this adds a new bound variable, we increment \code{n} by one when reifying the body of \code{f}.
 
 \begin{lstlisting}
     reify n (Neutral m)  = NfNeutralForm (reifyNeutral n m)
-        where 
+        where
             reifyNeutral :: Int -> NeutralV -> NeutralForm
-            reifyNeutral n (NeVLevel k) = NeVar (n - 1 - k)
-            reifyNeutral n (NeVApp p q) = NeApp (reifyNeutral n p) (reify n q)
+            reifyNeutral n (NeVFreeVar k)  = NeVar (n + k)
+            reifyNeutral n (NeVBoundVar k) = NeVar (n - 1 - k)
+            reifyNeutral n (NeVApp p q)    = NeApp (reifyNeutral n p) (reify n q)
 \end{lstlisting}
+
+Since the first \code{n} de Bruijn indices are bound, to reify a bound variable, we increment the index of the variable at the outermost context of the term \code{k} by \code{n}.
+To reify a bound variable, we translate the de Bruijn level \code{k} back to its corresponding de Bruijn index \code{n - 1 - k}.
+
+\subsection{Normalisation}
 
 \begin{lstlisting}
-    normaliseDbExpr :: Int -> DbExpr -> DbExpr
-    normaliseDbExpr n = normalToExpr . reify n . eval initialEnv 
-        where
-            initialEnv = Map.fromList [(k, Neutral  (NeVLevel (n - 1 - k))) 
-                                      | k <-[0..(n - 1)]   ] 
+    normalise :: DbExpr -> NormalForm
+    normalise = reify 0 . eval initialEnv where
+        initialEnv = Map.empty  
 \end{lstlisting}
 
-\subsection{Fresh variables solution 2 - Locally nameless terms}
-
-Uses de Bruijn Indicies for syntax and deBruijn levels for semantics
-
-
-
-% Omega never terminates, infinte redution/NbE
+To \code{normalise} de Bruijn expressions, we first evaluate the term in the empty environment and then reify the expression, where no variables are bound. As in the untyped implementation, we have the same guarantees and caveats for normalisation. However, we have achieved our goal of removing the need for fresh name streams.
