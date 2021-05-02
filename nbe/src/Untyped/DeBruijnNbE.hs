@@ -2,7 +2,7 @@
 module Untyped.DeBruijnNbE (normaliseDbExpr) where 
 import Prelude hiding ( lookup, empty )
 import Data.Map (  insert, Map, mapKeys, lookup)
-import qualified Data.Map as Map ( fromList )
+import qualified Data.Map as Map ( fromList, empty )
 import Control.Monad.State ( MonadState(get), State, modify, evalState )
 import Data.Set ( Set, singleton, delete, union, notMember, toList )
 import qualified Data.Set as Set (size)
@@ -32,14 +32,14 @@ type Env = Map Int V
 ---- Core NbE Functions
 
 -- Converts epxression syntax to semantics
-eval :: Env -> DbExpr -> V
+eval ::  Env -> DbExpr -> V
 eval env (DbVar x) = case lookup x env of
         -- Bound variable, returns the semantic value bound to x in the environment
         Just y -> y
 
         -- Free variable, embed into semantics as is
         -- TODO: What to do with free variables?
-        Nothing -> undefined
+        Nothing -> Neutral (NeVLevel (length env - 1 - x))
 
 eval env (DbLam m) = Function f where
         f :: V -> V
@@ -85,26 +85,24 @@ neutralToExp (NeApp n m) = DbApp (neutralToExp n) (normalToExpr m)
 ---- Normalisation functions  
 
 -- Normalises a deBruijn expression given that it contains n free variables
-normaliseDbExpr :: Int -> DbExpr -> DbExpr
-normaliseDbExpr n = normalToExpr . reify n . eval initialEnv where
+normaliseDbExpr :: DbExpr -> DbExpr
+normaliseDbExpr = normalToExpr . reify 0 . eval initialEnv where
     -- The first n deBruijn indicies correspond to the free variables
     -- Their semantic representation is the final n deBruijn levels 
-    initialEnv = Map.fromList [(k, Neutral (NeVLevel (n - 1 - k))) | k <-[0..(n - 1)]] 
+    -- initialEnv = Map.fromList [(k, Neutral (NeVLevel (n - 1 - k))) | k <-[0..(n - 1)]] 
+    initialEnv = Map.empty 
 
 -- Main NbE Function
 -- Given a string-named expression, produces the string named normal form
 normalise :: Expr -> Expr
 normalise expr = (deBruijnExprToExpr indexToName freshVariableStream 
-                  . normaliseDbExpr n 
+                  . normaliseDbExpr 
                   . exprToDeBruijnExpr nameToIndex) expr where
 
     freeVariables = getFreeVariables expr
 
     -- Needed for string-named to deBruijn conversion 
     nameToIndex = getFreeVariableMapping freeVariables
-
-    -- Needed for normalisation of deBruijn terms
-    n = Set.size freeVariables
     
     -- Needed for deBruijn to string-named conversion
     indexToName = invertMap nameToIndex
@@ -112,14 +110,14 @@ normalise expr = (deBruijnExprToExpr indexToName freshVariableStream
 
 --- Combinators
 
-identity :: Expr
-identity = ExpLam "x" (ExpVar "x")
+identity :: DbExpr 
+identity = DbLam (DbVar 0)
 
-k1 :: Expr
-k1 = ExpLam "x" (ExpLam "y" (ExpVar "x"))
+k1 :: DbExpr 
+k1 = DbLam (DbLam (DbVar 1))
 
-k2 :: Expr
-k2 = ExpLam "x" (ExpLam "y" (ExpVar "y"))
+k2 :: DbExpr 
+k2 = DbLam (DbLam (DbVar 0))
 
-omega :: Expr
+omega :: Expr 
 omega = ExpApp (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x"))) (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x")))
