@@ -171,7 +171,10 @@ Using the implementations of \code{eval} and \code{reify}, we can define the \co
             freshNames = (getFreshVariableStream . getFreeVariables) exp
 \end{lstlisting}
 
-\code{normalise} takes an expression, and returns its normal form. Since \code{normalise} returns a value of type \code{NormalForm} it is guaranteed that the returned expression is normal. First we evaluate the given expression in the empty environment, since no variables are bound to begin with. Then we reify the returned semantic value of type \code{V} back into a concrete \code{NormalForm} term.
+\code{normalise} takes an expression, and returns its normal form. Since \code{normalise} returns a value of type \code{NormalForm} it is guaranteed that the returned expression is normal. First we evaluate the given expression in the empty environment, since no variables are bound to begin with. Then we reify the returned semantic value of type \code{V} back into a concrete \code{NormalForm} term. 
+
+Some terms such as $(\lambda x.x x)(\lambda x.x x)$ do not have a normal form. However, the \code{normalise} type signature guarantees that all expressions can be normalised to a normal form. The resolution to this paradox is that in cases where terms do not have a normal form, \code{normalise} will not terminate so will never produce a normal form. In particular, such expressions do not have a representation in the semantic state, so \code{eval} never terminates. For example, when evaluating $(\lambda x.x x)(\lambda x.x x)$, \code{eval} reaches a stage where it must evaluate the Haskell application \code{(\v -> app v v) (\v -> app v v)}. Following the definition of \code{app}, we find that this evaluates to the same expression, and thus will never finish evaluating. This is similar to the corresponding $\beta$-reduction, where $(\lambda x.x x)(\lambda x.x x) \rightarrow_\beta (\lambda x.x x)(\lambda x.x x)$, except that in NbE this infinte contraction happens in the semantics.
+
 
 We produce a stream of valid fresh variable names \code{freshVars} of type \code{[Name]} for the given expression using the following functions.
 
@@ -190,11 +193,11 @@ We produce a stream of valid fresh variable names \code{freshVars} of type \code
 
 \code{getFreeVariables} takes an expression and returns the set of free variable names. \code{getFreshVariableStream} takes the set of free variable names and returns a stream of fresh variable names, since each of the names are distinct from each other and the free variables.
 
+While this approach works, generating fresh variables is a fragile procedure. The correctness of the algorithm depends on it, however \code{getFreeVariables} does not have the same type guarantees as the rest of the implementation, so mistakes would be easy to make and difficult to notice. Another drawback of the Gensym approach is that \code{reify} is indexed by an infinite stream of variable names, which is difficult to reason about. This is not a functional approach since we essentially use this parameter as state storage. 
+
 \section{de Bruijn NbE}
 
-Another approach to resolve the fresh variable problem is to use a different representation of lambda calculus terms where variables are simpler. In general, a variable can be thought of as a pointer to the lambda that binds it. Named terms do this by labelling lambdas and referencing them in variables using their names. de Bruijn terms take a different approach which we describe below, but fundamentally both approaches serve the purpose, so represent the same set of terms.
-
-% TODO: DbTerms
+One approach to resolve the fresh variable problem is to remove variable names from the syntax altogether, and use an alternative, unnamed, representation of lambda calculus terms. In general, a variable can be thought of as a pointer to the lambda that binds it. Named terms do this by labelling lambdas and referencing them in variables using their names. de Bruijn terms take a different approach which we describe below, but fundamentally both approaches serve the same purpose, so represent the same set of terms.
 
 de Bruijn terms are defined as follows. \cite{deBruijnNotation}
 
@@ -204,7 +207,7 @@ de Bruijn terms are defined as follows. \cite{deBruijnNotation}
                 | DbApp DbExpr DbExpr
 \end{lstlisting}
 
-In de Bruijn terms, lambda terms are not named, as seen in the definition of \code{DbLam}. Instead, each variable refers to the lambda that binds it using a de Bruijn index: the number of lambdas between the occurrence of the variable and the lambda which binds it. 
+In de Bruijn terms, lambda terms are not named, as seen in the definition of \code{DbLam}. Instead, each variable refers to the lambda that binds it using a de Bruijn index: the number of lambdas between the occurrence of the variable and the lambda which binds it. If we think of the set of bound variables at each point of the term as a stack, with the most recently bound variable at the top, then the de Bruijn index of a variable is the number of bindings you have to pop from this scope stack to reach the variable.
 
 \begin{figure}[h]
     \centering
