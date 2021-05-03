@@ -9,6 +9,7 @@ import Data.Set ( Set, singleton, delete, union, notMember )
 
 import Untyped.Utils (getFreeVariables, getFreshVariableStream)
 import Untyped.TypeDeclarations (Name, Expr(..)) 
+import Criterion.Main
 
 -- State monad for generating fresh variable names
 -- Fresh variables represented as a stream of variable names

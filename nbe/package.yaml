@@ -24,6 +24,7 @@ dependencies:
 - containers
 - mtl
 - QuickCheck
+- criterion
 
 library:
   source-dirs: src
