@@ -252,7 +252,7 @@ Once we have annotated the argument types, type-checking and compilation succeed
     \label{fig:agdaIdOPE}
 \end{figure}
 
-Before implementing the lambda case of \code{eval}, we need to define the identity \code{OPE} function from figure \ref{fig:agdaIdOPE} in Haskell. This function pattern matches on the type-level context $\Gamma$ and produces the identity \code{OPE} proving that $\Gamma$ is contained in $\Gamma$. In Haskell, standard functions cannot pattern match on types, so we use an alternative construction to pattern match at the type level.
+Before implementing the lambda case of \code{eval}, we need to define the identity \code{OPE} function from figure \ref{fig:agdaIdOPE} in Haskell. This function pattern matches on the type-level context $\Gamma$ and produces the identity \code{OPE} proving that $\Gamma$ is contained in $\Gamma$. This is known as a dependent pattern match, as the result of the function is dependent of the type of its arguments. In Haskell, standard functions cannot pattern match on types, so we use an alternative construction, inspired by the singleton pattern \cite{singletons}, to pattern match at the type level
 
 % IDEAS: Functionality, Agda implementation, why not in Haskell, solution, how works (runtime-lookup), limitations?
 
@@ -373,6 +373,7 @@ The other section of the program where we evaluate a semantic function \code{f} 
 % TODO: Motivate evalNeutral and rename, contrast with standard eval
 
 \section{Normalisation}
+\label{sect:typedNormalisation}
 
 \begin{figure}[h]
     \centering
@@ -448,7 +449,7 @@ Whilst it is guaranteed that the returned expression of \code{normalise} is norm
 
 % TODO: Move above to evaluation/conclusion
 
-\section{Notes}
+\section{Notes - IGNORE FOR PROOF READING}
 
 Investigation: Are GADTs in Haskell powerful enough? Types are erased at runtime so true dependent typing not part of Haskell (programs at type level)
 

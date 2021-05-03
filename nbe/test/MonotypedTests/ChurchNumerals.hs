@@ -6,7 +6,8 @@ import Monotyped.TypeDeclarations (
     ClosedExpr, 
     Ty(..), 
     Elem(..), 
-    normaliseDB
+    normaliseDB,
+    normalise
     )
 
 type ChurchNumeralTy = ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy)

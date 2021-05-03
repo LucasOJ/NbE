@@ -200,9 +200,9 @@ We produce a stream of valid fresh variable names \code{freshVars} of type \code
 
 \subsection{Motivation}
 
-While the Gensym approach works, generating fresh variables is a fragile procedure. The correctness of \code{normalise} depends on it, however \code{getFreeVariables} does not have the same type guarantees as the rest of the implementation, so mistakes would be easy to make and difficult to notice. Another drawback of the Gensym approach is that \code{reify} is indexed by an infinite stream of variable names, which is difficult to reason about. This is not a functional approach since we essentially use this parameter as state storage. 
+While the Gensym approach works, generating fresh variables is a fragile procedure. The correctness of \code{normalise} depends on it, however mistakes in the implementation would be easy to make and difficult to notice. Another drawback of the Gensym approach is that \code{reify} is indexed by an infinite stream of variable names, which is difficult to reason about.
 
-One approach to resolve the fresh variable problem is to remove variable names from the syntax altogether by using an alternative, unnamed, representation of lambda calculus terms. In general, a variable can be thought of as a pointer to the lambda that binds it. Named terms do this by labelling lambdas and referencing them in variables using their names. de Bruijn terms take a different approach which we describe below, but fundamentally both approaches serve the same purpose, so represent the same set of terms.
+One approach to resolve the fresh variable problem is to remove variable names from the syntax altogether, by using an alternative representation of lambda calculus terms. In general, a variable can be thought of as a pointer to the lambda that binds it. Named terms do this by labelling lambdas and referencing them in variables using their names. de Bruijn terms take a different approach which we describe below, but fundamentally both approaches serve the same purpose, so represent the same set of terms.
 
 \subsection{Introduction to de Bruijn Terms}
 
@@ -239,7 +239,7 @@ In de Bruijn terms, lambda terms are not named, as seen in the definition of \co
 
 Variables with indices greater than the number of bound lambdas are treated as free. For example, we could represent the term $y (\lambda x.xy)$ as $0 (\lambda .01)$ using de Bruijn terms. In the above term we have implicitly bound the free variable $y$ to 0 at the top level of the term. Note that we refer to $y$ using the index $1$ inside the lambda since the lambda introduces a bound variable in the context of its body. 2 $(\lambda . 0 3)$ is an equivalent term where $y$ is implicitly bound to 2 at the top level.
 
-We now roughly follow an implementation by Andreas Abel for normalising the lambda calclus with de Bruijn terms \cite{deBruijn}.
+We now define NbE for the de Bruijn lambda calculus terms. Our implementation is inspired by an implementation by Andreas Abel \cite{deBruijn}, but diverges from it to improve type-safety.
 
 \subsection{Syntax}
 
@@ -266,7 +266,7 @@ We also redefine the semantic set for de Bruijn terms.
                   | NeVApp NeutralV V
 \end{lstlisting}
 
-Our implementation of the syntactic set differs slightly from Abel's. Abel uses indexing tricks to differentiate between bound and free variables in the semantic set, whereas in our implementation uses distinct constructors to distinguish between them. This choice makes it easier to understand the operation of the code and avoids index manipulation errors.
+Our implementation uses distinct constructors to distinguish between free and bound variables in the semantic set, which makes it easier to understand the operation of the code and improves type safety.
 
 % TODO: De Bruijn levels not indicies - motivate with problem as indicies dependent on full term but want V to fully define 
 
@@ -289,11 +289,14 @@ The \code{eval} function for de Bruijn terms operates similarly to the gensym ev
 
 In the variable case we lookup the semantic interpretation of bound variables from the environment. 
 
-In Abel's implementation, all the free variables are also bound to semantic values in the initial environment before evaluating begins. Thus, in the \code{Nothing} case of the variable lookup, we would have to return \code{undefined}. Additionally, the algorithm is only correct if the pre-processing of the term is free from errors. Avoiding fragile pre-processing and implicit assumptions was the motivation for moving to de Bruijn notation, so we have modified Abel's implementation to improve type-safety.
+% Q: Remove START
+In Abel's implementation, all the free variables are bound to semantic values in the initial environment before evaluation begins. Since we assume that all variables are present in the environment, in the \code{Nothing} case of the variable lookup, we would have to return \code{undefined}. The algorithm is only correct if initial environment binds all free variables. Avoiding fragile pre-processing and implicit assumptions was the motivation for moving to de Bruijn notation, so we have modified Abel's implementation to improve type-safety.
 
-Instead of assuming all free variables are already bound in the environment, we generate their semantic interpretations as we evaluate the term. We start with an empty initial environment, so the \code{Nothing} case corresponds to a free variable, as it did in the untyped implementation. 
+Instead of assuming all free variables are already bound in the environment, we generate their semantic interpretations as we evaluate the term. We start with an empty initial environment, so the \code{Nothing} case corresponds to evaluation of a free variable, as it did in the named implementation. 
 
-de Bruijn indices are not suitable for indexing variables in the semantic set, as they are the dependent on the number of bindings in the context in which they occur. This context will change as redexes are contracted by \code{eval} and lambda bindings are removed. We choose a semantic representation for free variables where all occurrences of the same free variable are identified with the same semantic value.
+% Q: Remove END
+
+de Bruijn indices are not suitable for indexing variables in the semantic set, as they are the dependent on the number of bindings in the context in which they occur. This context will change as redexes are contracted and lambda bindings removed by \code{eval}. We choose a semantic representation for free variables where all occurrences of the same free variable are identified with the same semantic value.
 \code{eval} returns a semantic variable with the index of same variable at the outermost context of the term. It calculates this by subtracting the number of bindings in the current context (\code{size env}) from the syntactic index \code{x}. Thus, every occurrence of the free variable will be identified with the same semantic value, regardless of where it occurs in the term. 
 
 \begin{lstlisting}
@@ -303,7 +306,7 @@ de Bruijn indices are not suitable for indexing variables in the semantic set, a
         env' = insert 0 v (mapKeys (+1) env)
 \end{lstlisting}
 
-As in the named approach, the semantic representation chosen for functions is a Haskell function that takes a semantic value \code{v}, and returns the semantic interpretation of the lambda body with the bound variable interpreted as \code{v}. They key difference to the untyped implementation is the construction of the new environment. We first increment all other indices by 1 since we have introduced a new lambda between each variable and its associated binding. Then, to introduce the new variable bound by the lambda into the environment, we bind the 0th index to \code{v} in the shifted environment.
+As in the named approach, the semantic representation chosen for functions is a Haskell function that takes a semantic value \code{v}, and returns the semantic interpretation of the lambda body with the bound variable interpreted as \code{v}. They key difference to the named implementation is the construction of the new environment. We first increment all other indices by 1, since we have introduced a new lambda between each variable and its associated binding. Then, to introduce the new variable bound by the lambda into the environment, we bind the 0th index to \code{v} in the shifted environment.
 
 The application case remains exactly the same as in the Gensym implementation since the approach for contracting redexes is identical.
 
@@ -313,17 +316,17 @@ The application case remains exactly the same as in the Gensym implementation si
     reify :: Int -> V -> NormalForm
 \end{lstlisting}
 
-Reification for de Bruijn terms also follows a similar structure to the Gensym approach. However, instead of taking a stream of fresh variables, the de Bruijn \code{reify} function only needs the number of bound variables in the semantic value of type \code{V}. This is significantly easier to reason about and much less stateful than the Gensym \code{reify} function.
+Reification for de Bruijn terms also follows a similar structure to the Gensym approach. However, instead of taking a stream of fresh variables, the de Bruijn \code{reify} function only needs the number of bound variables in the semantic value of type \code{V}. This is significantly easier to reason about than the Gensym \code{reify} function.
 
 \begin{lstlisting}
     reify n (Function f) = NfLam (reify (n + 1) (f (Neutral (NeVBoundVar n))))
 \end{lstlisting}
 
-As in the untyped implementation, to reify a function \code{f} we return a lambda where the body of the term is the reification of \code{f} at a fresh variable. However, generating a fresh variable is much simpler than in the untyped implementation. 
+As in the untyped implementation, to reify a function \code{f} we return a lambda where the body of the term is the reification of \code{f} at a fresh variable.
 
-We use de Bruijn levels to represent bound variables in the semantic set, as Abel does in his implementation. de Bruijn Levels work in the opposite way to indices: the de Bruijn level 0 corresponds to the oldest bound variable in scope, rather than the newest. 
+We use de Bruijn levels to represent bound variables in the semantic set, as Abel does in his implementation. de Bruijn levels work in the opposite way to indices: the de Bruijn level 0 corresponds to the oldest bound variable in scope, rather than the newest. 
 
-Since \code{n} variables are bound in \code{f}, the de Bruijn levels which have already been bound are $0, 1, \dots, n - 1$. Thus, \code{NeVBoundVar n} is a fresh variable. Since this adds a new bound variable, we increment \code{n} by one when reifying the body of \code{f}.
+Since \code{n} variables are bound in \code{f}, the de Bruijn levels which have already been bound are $0, 1, \dots, n - 1$. Thus, \code{NeVBoundVar n} is a fresh variable. Since we have introduced a new bound variable, we increment \code{n} by one when reifying the body of \code{f}.
 
 \begin{lstlisting}
     reify n (Neutral m)  = NfNeutralForm (reifyNeutral n m)
@@ -334,7 +337,7 @@ Since \code{n} variables are bound in \code{f}, the de Bruijn levels which have 
             reifyNeutral n (NeVApp p q)    = NeApp (reifyNeutral n p) (reify n q)
 \end{lstlisting}
 
-Since the first \code{n} de Bruijn indices are bound, to reify a bound variable, we increment the index of the variable at the outermost context of the term \code{k} by \code{n}.
+Since the first \code{n} de Bruijn indices refer to bound variables, to reify a free variable, we increment the index of the variable at the outermost context of the term \code{k} by \code{n}.
 To reify a bound variable, we translate the de Bruijn level \code{k} back to its corresponding de Bruijn index \code{n - 1 - k}.
 
 \subsection{Normalisation}
@@ -345,4 +348,4 @@ To reify a bound variable, we translate the de Bruijn level \code{k} back to its
         initialEnv = Map.empty  
 \end{lstlisting}
 
-To \code{normalise} de Bruijn expressions, we first evaluate the term in the empty environment and then reify the expression, where no variables are bound. As in the untyped implementation, we have the same guarantees and caveats for normalisation. However, we have achieved our goal of removing the need for fresh name streams.
+To \code{normalise} de Bruijn expressions, we first evaluate the term in the empty environment and then reify the expression which initially has no bound variables. As in the untyped implementation, we have the same guarantees and caveats for normalisation. However, we have achieved our goal of removing the need for a fresh name stream.

@@ -58,6 +58,10 @@ data NeutralForm :: [Ty] -> Ty -> * where
     NeutralVar :: Elem ctx ty -> NeutralForm ctx ty
     NeutralApp :: NeutralForm ctx (arg :-> result) -> NormalForm ctx arg -> NeutralForm ctx result
 
+instance Show (NormalForm ctx ty) where
+    show (NormalNeutral n) = "NN"
+    show (NormalLam f) = "F"
+
 -- Semantics
 
 -- Order Preserving Embeddings
