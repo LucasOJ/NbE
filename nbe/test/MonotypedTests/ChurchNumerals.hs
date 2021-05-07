@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, TypeOperators#-}
-module ChurchNumerals () where
+module MonotypedTests.ChurchNumerals () where
 
 import Monotyped.TypeDeclarations (
     Expr(..), 
@@ -56,3 +56,5 @@ multChurchNumeral = app2 churchMult
 
 prop_mult :: Int -> Int -> Bool 
 prop_mult m n = normaliseDB (multChurchNumeral (toChurchNumeral m) (toChurchNumeral n)) == normaliseDB (toChurchNumeral (m * n))
+
+

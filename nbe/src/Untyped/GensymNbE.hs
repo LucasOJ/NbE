@@ -1,5 +1,8 @@
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 
-module Untyped.GensymNbE () where
+module Untyped.GensymNbE (
+    normalise,
+) where
 import Prelude hiding ( lookup, empty )
 import Data.Map (  insert, Map, mapKeys, lookup )
 import qualified Data.Map as Map (empty) 
@@ -9,7 +12,9 @@ import Data.Set ( Set, singleton, delete, union, notMember )
 
 import Untyped.Utils (getFreeVariables, getFreshVariableStream)
 import Untyped.TypeDeclarations (Name, Expr(..)) 
-import Criterion.Main
+import Control.DeepSeq
+import GHC.Generics (Generic)
+
 
 -- State monad for generating fresh variable names
 -- Fresh variables represented as a stream of variable names
@@ -18,12 +23,12 @@ type FreshName = State [Name]
 -- Expressions with no reductions
 data NormalForm = NfNeutralForm NeutralForm
                 | NfLam Name NormalForm
-    deriving (Read, Show)
+    deriving (Show, Generic, NFData)
 
 -- Expressions that can be reified (also contain no reductions)
 data NeutralForm = NeVar Name
                  | NeApp NeutralForm NormalForm
-    deriving (Read, Show)
+    deriving (Show, Generic, NFData)
 
 -- Semantics
 data V = Neutral NeutralV
@@ -131,17 +136,3 @@ normalToExpr (NfLam var n) = ExpLam var (normalToExpr n)
 neutralToExp :: NeutralForm -> Expr
 neutralToExp (NeVar i) = ExpVar i
 neutralToExp (NeApp n m) = ExpApp (neutralToExp n) (normalToExpr m)
-
---- Combinators
-
-identity :: Expr
-identity = ExpLam "x" (ExpVar "x")
-
-k :: Expr
-k = ExpLam "x" (ExpLam "y" (ExpVar "x"))
-
-k1 :: Expr
-k1 = ExpLam "x" (ExpLam "y" (ExpVar "y"))
-
-omega :: Expr
-omega = ExpApp (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x"))) (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x")))

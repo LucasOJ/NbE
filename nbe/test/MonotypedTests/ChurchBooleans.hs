@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, TypeOperators#-}
-module ChurchBooleans () where
+module MonotypedTests.ChurchBooleans () where
 
 import Monotyped.TypeDeclarations (
     Expr(..), 

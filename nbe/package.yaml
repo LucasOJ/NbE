@@ -25,6 +25,7 @@ dependencies:
 - mtl
 - QuickCheck
 - criterion
+- deepseq
 
 library:
   source-dirs: src
