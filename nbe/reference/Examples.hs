@@ -28,6 +28,8 @@ data Elem :: [a] -> a -> * where
     -- The proof is still valid is we prepend an element to the list
     Tail :: Elem xs x -> Elem (y ': xs) x
 
+deriving instance (Eq (Elem xs x))
+
 data Expr :: [Ty] -> Ty -> * where
     Var :: Elem ctx ty -> Expr ctx ty
     Lam :: Expr (arg ': ctx) result -> Expr ctx (arg ':-> result)
@@ -74,3 +76,24 @@ instance SingContext '[] where
 
 instance (SingContext xs) => SingContext (x:xs) where
     idOpe = Keep idOpe
+
+data Exp a where
+    I   :: Int  -> Exp Int
+    B   :: Bool -> Exp Bool
+    Add :: Exp Int -> Exp Int -> Exp Int
+    Mul :: Exp Int -> Exp Int -> Exp Int
+    Eq  :: Eq a => Exp a -> Exp a -> Exp Bool
+
+deriving instance (Show (Exp a))
+
+instance Eq (NormalForm ctx ty) where
+    (NormalNeutral n) == (NormalNeutral m) = n == m
+    (NormalLam n) == (NormalLam m) = n == m
+    _ == _ = False
+
+instance Eq (NeutralForm ctx ty) where
+    (NeutralVar n) == (NeutralVar m) = n == m
+    (==) (NeutralApp (n :: NeutralForm ctx (arg1 :-> ty)) m) 
+         (NeutralApp (x :: NeutralForm ctx (arg2 :-> ty)) y) 
+          = n == x && m == y 
+    _ == _ = False

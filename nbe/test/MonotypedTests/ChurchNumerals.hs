@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, TypeOperators#-}
 module MonotypedTests.ChurchNumerals () where
 
-import Monotyped.TypeDeclarations (
+import Monotyped.NbE (
     Expr(..), 
     ClosedExpr, 
     Ty(..), 

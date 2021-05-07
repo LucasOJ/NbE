@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds, TypeOperators, PolyKinds, GADTs #-}
 {-# LANGUAGE ScopedTypeVariables, RankNTypes #-}
 
-module Monotyped.TypeDeclarations (
+{-# LANGUAGE StandaloneDeriving #-}
+module Monotyped.NbE (
     Ty(..),
     Elem(..),
     Expr(..),
@@ -10,6 +11,9 @@ module Monotyped.TypeDeclarations (
     normaliseDB,
     SingTy
 ) where 
+
+import Control.DeepSeq
+import GHC.Generics (Generic)
 
 import qualified Untyped.TypeDeclarations as Untyped (DbExpr(..), Expr(..))
 
@@ -25,10 +29,8 @@ data Elem :: [a] -> a -> * where
     -- The proof is still valid is we prepend an element to the list
     Tail :: Elem xs x -> Elem (y ': xs) x
 
-instance Show (Elem xs x) where
-    show Head = "Head"
-    show (Tail Head) = "Tail Head"
-    show (Tail n) = "Tail (" ++ show n ++ ")" 
+deriving instance (Show (Elem ctx ty))
+deriving instance (Eq (Elem ctx ty))
 
 -- Syntactic typed DeBruijn expressions
 -- Each of the values is a term, and its type contains the typing context and type of the term
@@ -40,11 +42,7 @@ data Expr :: [Ty] -> Ty -> * where
     -- Given an expression applied to a term of function type, we can apply the argument to the function
     App :: Expr ctx (arg :-> result) -> Expr ctx arg -> Expr ctx result 
 
-instance Show (Expr ctx ty) where
-    show (Var Head) = "Var Head"
-    show (Var elem) = "Var (" ++ show elem ++ ")"
-    show (Lam body) = "Lam (" ++ show body ++ ")"
-    show (App m n)  = "App (" ++ show m ++ ") (" ++ show n ++ ")"
+deriving instance (Show (Expr ctx ty))
 
 type ClosedExpr ty = Expr '[] ty
 
@@ -52,15 +50,11 @@ type ClosedExpr ty = Expr '[] ty
 -- Mirrors Expr other than that you can't apply a term to a Lambda
 data NormalForm :: [Ty] -> Ty -> * where
     NormalNeutral :: NeutralForm ctx ty -> NormalForm ctx ty
-    NormalLam     :: NormalForm (arg ': ctx) result -> NormalForm ctx (arg :-> result)    
+    NormalLam     :: NormalForm (arg ': ctx) result -> NormalForm ctx (arg :-> result)
 
 data NeutralForm :: [Ty] -> Ty -> * where
     NeutralVar :: Elem ctx ty -> NeutralForm ctx ty
     NeutralApp :: NeutralForm ctx (arg :-> result) -> NormalForm ctx arg -> NeutralForm ctx result
-
-instance Show (NormalForm ctx ty) where
-    show (NormalNeutral n) = "NN"
-    show (NormalLam f) = "F"
 
 -- Semantics
 
