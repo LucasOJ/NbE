@@ -1,0 +1,67 @@
+\chapter{Critical Evaluation}
+\label{chap:evaluation}
+
+% This chapter is intended to evaluate what you did.  The content is highly 
+% topic-specific, but for many projects will have flavours of the following:
+% 
+% \begin{enumerate}
+% \item functional  testing, including analysis and explanation of failure 
+%       cases,
+% \item behavioural testing, often including analysis of any results that 
+%       draw some form of conclusion wrt. the aims and objectives,
+%       and
+% \item evaluation of options and decisions within the project, and/or a
+%       comparison with alternatives.
+% \end{enumerate}
+% 
+% \noindent
+% This chapter often acts to differentiate project quality: even if the work
+% completed is of a high technical quality, critical yet objective evaluation 
+% and comparison of the outcomes is crucial.  In essence, the reader wants to
+% learn something, so the worst examples amount to simple statements of fact 
+% (e.g., ``graph X shows the result is Y''); the best examples are analytical 
+% and exploratory (e.g., ``graph X shows the result is Y, which means Z; this 
+% contradicts [1], which may be because I use a different assumption'').  As 
+% such, both positive {\em and} negative outcomes are valid {\em if} presented 
+% in a suitable manner.
+
+\section{Testing}
+
+\section{Evaluation of Language Features}
+
+\subsection{GADTs}
+
+We found that \code{GADTs} is an excellent extension for emulating dependent types when combined with \code{PolyKinds}. GADT syntax allowed us to define types \code{Expr} with much greater precision and enabled us to translate Agda \code{data} definitions such as \code{OPE} and type generating functions such as $\text{Ty}^\text{N}$, that otherwise could not be expressed in Haskell.
+
+However, during the analysis and testing of our implementation, we found that GADTs indexed by types can create difficulties for deriving useful class instances. For example, it would be desirable for \code{NormalForm} to be a member of the \code{Eq} class, so that during testing we could directly check if two normal forms are equal. 
+
+\begin{lstlisting}
+    instance Eq (NeutralForm ctx ty) where
+        (NeutralVar n) == (NeutralVar m) = n == m
+        (==) (NeutralApp (n :: NeutralForm ctx (arg1 :-> ty)) m) 
+             (NeutralApp (x :: NeutralForm ctx (arg2 :-> ty)) y) 
+              = n == x && m == y 
+        _ == _ = False
+\end{lstlisting}
+
+Here we have attempted to implement an \code{Eq} instance for \code{NeutralForm}, which is needed to determine equality between normal forms. The variable case doesn't pose any problems, as GHC can automatically derive an \code{Eq} instance for \code{Elem}. However, in the application case we cannot be sure that \code{arg1} and \code{arg2} are equal, since they are universally quantified type variables. Because of this, \code{n} and \code{x} may have different types, and so we cannot determine equality between them. Thus, the instance fails to compile.
+
+We attempted to benchmark the typed NbE implementation, to evaluate how much performance overhead the additional type information incurred compared to the untyped implementation. However, to use Haskell's benchmarking features, we need a \code{NormalForm} instance for the \code{NFData} class. As \code{NormalForm} is a GADT, GHC is unable to automatically derive the instance. This further exemplifies how the class limitation makes GADTs more difficult to work with, and it would be interesting to explore whether this limitation could be overcome.
+
+In general, we believe that GADTs are a useful tool for Haskell developers to improve the type-safety of their programs by taking advantage of the programs as proof paradigm. However, the instance deriving limitation shows that the extension is not completely mature yet.
+
+\subsection{Dependent Pattern Matching}
+
+For our implementation, the class instance trick for performing dependent pattern matching on types worked well. Passing singleton class constraints through the program did add syntactic noise and required some thought, but passing constraints through type signatures had no effect on the function implementations. In some situations we were forced to add type constraints to data types themselves. 
+% TODO: Needs type annotation, implementation has effect on data, not nice.
+
+Our boilerplate overhead was small, since we only needed dependent pattern matches for a few functions. However, as noted in Section \ref{sect:typedNormalisation} for more complex applications with many dependent pattern matches, this boilerplate could become more difficult to manage. The boilerplate was also compact since our implementation only required pattern matches on the structure of types. For example, \code{idOpe} only depended on the length of the type-level context, so there was no need to identify its contents. This meant we only used a portion of the singleton pattern, which can be used to extract all the type-level information into the value level, at the cost of additional boilerplate.
+
+Richard Eisenberg's proposals for built-in dependent pattern matches using a syntax to Agda would be a much cleaner approach than \code{GADTs}, but the current solution for managing dependent pattern matches is the \code{singleton} library. This library uses template Haskell to automatically generate the instances and data types needed for “faking” dependent pattern matches, and would be useful for dependent pattern matching at scale.
+
+\subsection{Arbitrary-Rank Polymorphism}
+
+When defining the \code{Function} constructor of the STLC semantic set, we used explicit \code{forall} syntax to implement nested polymorphism. Whilst this satisfied most type requirements, when constructing concrete \code{Function} elements, GHC could not infer necessary type variable equalities to complete type-checking. We resolved this issue by using type annotations to bind type variables in function arguments. 
+
+An interesting area for further study could be to identify why type inference was not able to derive the type variable equalities in these cases. We suspect that it could be due to the higher ranked polymorphism, as \code{Function} was the only definition in our implementation that made use of the \code{RankNTypes} extension.
+

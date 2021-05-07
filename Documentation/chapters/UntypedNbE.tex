@@ -10,14 +10,14 @@
     \label{fig:nbeOverview}
 \end{figure}
 
-NbE proceeds in two steps. The first is to evaluate terms of the lambda calculus into a semantic set. In \ref{fig:nbeOverview} terms are represented by dots in the syntax set and the evaluation function is denoted by $\llbracket - \rrbracket$, which we refer to as \code{eval}. The second step is to \code{reify} the semantic value back into the normal form of the original term. Thus, the composition of \code{eval} and \code{reify} yields the \code{normalise} function which maps terms to their normal forms. 
+NbE proceeds in two steps. The first is to evaluate terms of the lambda calculus into a semantic set. In Figure \ref{fig:nbeOverview} terms are represented by dots in the syntax set and the evaluation function is denoted by $\llbracket - \rrbracket$, which we refer to as \code{eval}. The second step is to \code{reify} the semantic value back into the normal form of the original term. Thus, the composition of \code{eval} and \code{reify} yields the \code{normalise} function which maps terms to their normal forms. 
 
 % property of eval
 \ref{fig:nbeOverview} illustrates why NbE works. The key property of the \code{eval} function is that $\beta$-equal terms (represented by dots of the same colour in the syntax set) evaluate to the same semantic value. This ensures that $\beta$-equal terms normalise to the same normal form. The key property of the \code{reify} function is that the codomain of \code{reify} is the subset of normal forms, so \code{normalise} is guaranteed to return a normal form. 
 
-The remainder of this chapter defines the data NbE operates on and functions to perform NbE in Haskell.
-
 \section{Gensym NbE}
+
+In this section implement NbE for the untyped lambda calculus in Haskell, following a mathematical specification by Lindley \cite{slides}. We begin by representing the sets that NbE will operate on as data types in Haskell, namely the term syntax, set of normal forms and semantic set. Once these sets are defined, we implement the \code{eval} and \code{reify} functions which compose to give the \code{normalise} function.
 
 \subsection{Syntax}
 
@@ -51,13 +51,7 @@ We now define the target syntax of the \code{normalise} function, \code{NormalFo
                   | NeVApp NeutralV V
 \end{lstlisting}
 
-% TODO: Mentional easy to define V -> V in Haskell, harder in other languages, motivating advantage of Haskell?
-
-The semantic set \code{V} has a very similar structure to the set of normal forms, however lambda terms are replaced with Haskell functions of type \code{V} $\rightarrow$ \code{V}.
-% TODO: Include following paragraph or not - not justified? 
-The similarity simplifies \code{reify} as for some terms there are obvious translations from semantics to syntax. The replacement of lambda terms will be useful in evaluating $\beta$-redexes at the semantic level instead of the syntactic level. 
-
-% TODO: Discuss using why don't use Neutral Form but establish our own datatype
+The semantic set \code{V} has a very similar structure to the set of normal forms, however lambda terms are replaced with Haskell functions of type \code{V} $\rightarrow$ \code{V}. Lindley's specification \cite{slides} describes the semantic set as a mathematical function space, however since our implementation uses Haskell as the mathematics, semantic functions correspond to Haskell functions. The \code{NeutralV}data type represents base set of the recursive function space, whose elements are semantic variables and applications.
 
 \subsection{Evaluation}
 
@@ -114,6 +108,7 @@ In the case where the first value is a function \code{f}, we evaluate \code{f} a
 % TODO: Explain more
 In the case that the first value is a value \code{n} of type \code{NeutralV}, there is no redex to contract, so we return a placeholder Neutral application at the semantic level.
 
+
 \subsection{Reification}
 
 % TODO: Cite name, in de Bruijn paper
@@ -122,11 +117,11 @@ Reification proceeds by pattern matching on the semantic value, and recursively 
 
 Since evaluating a lambda yields a function, reifying a function should yield a lambda to ensure that \code{normalise} preserves terms already in normal form. But what variable should the returned lambda term bind? The new bound variable should be different to all other bound variables in scope, otherwise \code{reify} could produce invalid terms. It should also be different to all other free variables in the original term, to prevent free variable capture. Since terms are considered equal up to bound variable renaming by $\alpha$-equivalence, we can choose any variable name that satisfies these requirements. 
 
-One approach to resolve this issue suggested by \cite{slides} is to generate a fresh variable name during reification whenever a new bound variable is needed. However, generating fresh variables during the execution of \code{reify} would require the function to track which variables have already been bound between calls to \code{reify}, which suggests the use of state. This could be modelled using the \code{State} monad, in which case \code{reify} would have the type signature \code{reify :: V -> State [Name] NormalForm}, where \code{[Name]} corresponds to a list of variable names that have already been bound. This would allow us to implicitly pass the list of bound variable names between calls to reify. However state introduces additional complexity and makes testing more difficult, which can lead to flawed implementations.
+One approach to resolve this issue suggested by \cite{slides} is to generate a fresh variable name during reification whenever a new bound variable is needed. However, generating fresh variables during the execution of \code{reify} would require the function to track which variables have already been bound between calls to \code{reify}, which suggests the use of state. This could be modelled using the \code{State} monad, in which case \code{reify} would have the type signature \code{reify :: V -> State [Name] NormalForm}, where \code{[Name]} corresponds to a list of variable names that have already been bound. This would allow us to implicitly pass the list of bound variable names between calls to reify. However, state introduces additional complexity and makes testing more difficult, which can lead to flawed implementations.
 
 %TODO: other problems with state monad (not really used mostly passing => redundant boilderplate to carry monad round), link to State monad implementation
 
-Instead, we opt for a more functional approach. Before the execution of \code{reify}, we generate a suitable stream of fresh variable names of type \code{[Name]}. By making \code{reify} a function of the semantic element and the stream of fresh variables, we can simply pop a fresh variable name from the stream whenever a new variable is bound. In recursive calls, \code{reify} only passes the tail of the stream to ensure bound variable names are never reused.
+Instead, we opt for a more direct approach. Before the execution of \code{reify}, we generate a suitable stream of fresh variable names of type \code{[Name]}. By making \code{reify} a function of the semantic element and the stream of fresh variables, we can simply pop a fresh variable name from the stream whenever a new variable is bound. In recursive calls, \code{reify} only passes the tail of the stream to ensure bound variable names are never reused.
 
 \begin{lstlisting}
     reify :: V -> [Name] -> NormalForm
@@ -339,6 +334,8 @@ Since \code{n} variables are bound in \code{f}, the de Bruijn levels which have 
 
 Since the first \code{n} de Bruijn indices refer to bound variables, to reify a free variable, we increment the index of the variable at the outermost context of the term \code{k} by \code{n}.
 To reify a bound variable, we translate the de Bruijn level \code{k} back to its corresponding de Bruijn index \code{n - 1 - k}.
+
+% \vspace{\baselineskip}
 
 \subsection{Normalisation}
 

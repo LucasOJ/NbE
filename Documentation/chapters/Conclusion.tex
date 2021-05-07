@@ -30,17 +30,12 @@
 % Summary of what we did 
 %   3 variations
 %   possible to translate Agda implementation to Haskell with type guarentees
-
+\section{Summary}
 In this dissertation we produced three variations of NbE. The first normalised named, untyped lambda calculus using the Gensym approach, following an implementation by Lindley \cite{slides}. Issues with fresh variable names inspired a second implementation for untyped de Bruijn terms which we adapted from a specification by Abel \cite{deBruijn}. GADTs were used to define the STLC in Haskell, before successfully translating an implementation of NbE for the SLTC by Kovacs \cite{AgdaNbe} from Agda to Haskell. We found that GHC compiler extensions are powerful enough to emulate some features of dependently typed languages.
 
-We found that \code{GADTs} is an excellent extension for emulating dependent types when combined with \code{PolyKinds}. GADT syntax allowed us to define types \code{Expr} with much greater precision, and enabled us to translate Agda \code{data} definitions such as \code{OPE} and type generating functions such as $\text{Ty}^\text{N}$. The type-refinement system when pattern matching on GADTs enabled us to write strongly typed functions with ease.
-% TODO: rephrase, tALK about eval above
-In general, we believe that GADTs are a useful and usable tool for Haskell developers to add type-safety to their programs by taking advantage of the programs as proof paradigm. 
+\section{Evaluation of Aims}
 
-For our implementation, the class instance trick for performing dependent pattern matches on types worked well. Passing singleton class constraints through the program did add syntactic noise and required some thought, but passing constraints through type signatures had no effect on the function implementations. Our boilerplate overhead was small, since we only needed dependent pattern matches for a few functions. However, as noted in Section \ref{sect:typedNormalisation} for more complex applications with many dependent pattern matches, this boilerplate could become more difficult to manage. The boilerplate was also compact since our implementation only required pattern matches on the structure of types. For example, \code{idOpe} only depended on the length of the type-level context, so there was no need to identify its contents. This meant we only used a portion of the singleton pattern, which can be used to extract all the type-level information into the value level, at the cost of additional boilerplate.
-Richard Eisenberg's proposals for built-in dependent pattern matches using a syntax to Agda would be a much cleaner approach \code{GADTs}, but the current solution for managing dependent pattern matches is the \code{singleton} library. This library uses template Haskell to automatically generate the Haskell boilerplate needed for “faking” dependent pattern matches.
-
-When defining \code{Function} elements of the STLC semantic set, GHC could not infer necessary type variable equalities to complete type-checking. We resolved this issue by using type annotations to bind type variables in function arguments. An interesting area for further study could be to identify why type inference was not able to derive the type variable equalities in these cases. We suspect that it could be due to the higher ranked polymorphism, as \code{Function} was the only definition in our implementation that made use of the \code{RankNTypes} extension.
+\section{Areas for Further Study}
 
 % Evaluation of Haskell language features in terms of typed NbE implementation
 %    Singletons worked well, complex applications could struggle
@@ -50,7 +45,7 @@ When defining \code{Function} elements of the STLC semantic set, GHC could not i
 %    type annotations, inference not as strong as type theories
 %    Untyped vs typed speed
 
-One practical reason developers may opt to implement programs in Haskell rather than dependently typed languages is performance. It would be interesting to benchmark the produced SLTC NbE implementation against its Agda counterpart, as a significant difference in performance could be compelling reason to choose one over the other in practice.
+One practical reason developers may opt to implement programs in Haskell rather than dependently typed languages is performance. It would be interesting to benchmark the produced SLTC NbE implementation against its Agda counterpart, as a significant difference in performance could be compelling reason to choose one over the other in practice. 
 
 Another avenue for future work is to translate Kovacs' full proof of correctness from Agda to Haskell???
 
