@@ -2,6 +2,7 @@
 
 module Untyped.GensymNbE (
     normalise,
+    normaliseToExpr
 ) where
 import Prelude hiding ( lookup, empty )
 import Data.Map (  insert, Map, mapKeys, lookup )
@@ -23,12 +24,12 @@ type FreshName = State [Name]
 -- Expressions with no reductions
 data NormalForm = NfNeutralForm NeutralForm
                 | NfLam Name NormalForm
-    deriving (Show, Generic, NFData)
+    deriving (Show, Generic, NFData, Eq)
 
 -- Expressions that can be reified (also contain no reductions)
 data NeutralForm = NeVar Name
                  | NeApp NeutralForm NormalForm
-    deriving (Show, Generic, NFData)
+    deriving (Show, Generic, NFData, Eq)
 
 -- Semantics
 data V = Neutral NeutralV
