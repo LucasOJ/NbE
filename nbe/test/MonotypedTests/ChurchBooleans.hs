@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, TypeOperators#-}
-module MonotypedTests.ChurchBooleans () where
+module MonotypedTests.ChurchBooleans (allTestsPassed) where
 
 import Monotyped.NbE (
     Expr(..), 
@@ -71,3 +71,27 @@ churchNot = App notExpr
         notExpr = Lam (app2 x k1 k) 
 
         x = Var Head
+
+unitTests :: [Bool]
+unitTests = [
+    normaliseDB (churchNot true :: BaseChurchBool) 
+        == normaliseDB (false :: BaseChurchBool),
+        
+    normaliseDB (churchNot false :: BaseChurchBool) 
+        == normaliseDB (true :: BaseChurchBool),
+        
+    normaliseDB (churchAnd (churchNot true) (churchOr false true) :: BaseChurchBool) 
+        == normaliseDB (false :: BaseChurchBool),
+        
+    normaliseDB (churchAnd (churchNot false) (churchOr false true) :: BaseChurchBool)
+        == normaliseDB (true :: BaseChurchBool),
+        
+    normaliseDB (churchAnd (churchAnd true true) (churchOr false true) :: BaseChurchBool)
+        == normaliseDB (true :: BaseChurchBool),
+        
+    normaliseDB (churchAnd (churchAnd true true) (churchOr false false) :: BaseChurchBool)
+        == normaliseDB (false :: BaseChurchBool)
+  ]
+
+allTestsPassed :: Bool
+allTestsPassed = and unitTests

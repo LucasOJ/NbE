@@ -1,9 +1,6 @@
-module UntypedTests.DeBruijnNbE () where
-import Criterion.Main
+module UntypedTests.DeBruijnNbE (allTestsPassed) where
 import Untyped.TypeDeclarations (DbExpr(..))
-import Data.Set
 import Untyped.DeBruijnNbE ( normalise, normaliseDbExpr )
-import Untyped.Utils ( getFreshVariableStream )
 
 app2 :: DbExpr -> DbExpr -> DbExpr -> DbExpr
 app2 f x = DbApp (DbApp f x)
@@ -100,7 +97,10 @@ unitTests = [
     normalise (churchAnd (churchNot true) (churchOr false true)) == normalise false,
     normalise (churchAnd (churchNot false) (churchOr false true)) == normalise true,
     normalise (churchAnd (churchAnd true true) (churchOr false true)) == normalise true,
-    normalise (churchAnd (churchAnd true true) (churchOr false false)) == normalise false
+    normalise (churchAnd (churchAnd true true) (churchOr false false)) == normalise false,
+    normalise (DbApp (DbLam (DbVar 1)) (DbVar 2)) == normalise (DbVar 0),
+    normalise (DbApp identity (DbVar 0)) == normalise (DbVar 0),
+    normalise (DbApp identity (DbVar 3)) == normalise (DbVar 3)
   ]
 
 allTestsPassed :: Bool

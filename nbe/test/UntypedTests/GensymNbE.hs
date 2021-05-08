@@ -1,5 +1,5 @@
 
-module UntypedTests.GensymNbE (gensymBenchmarks) where
+module UntypedTests.GensymNbE (gensymBenchmarks, allTestsPassed) where
 import Criterion.Main
 import Untyped.TypeDeclarations (Name, Expr(..))
 import Data.Set
@@ -106,7 +106,7 @@ churchAnd m n = app2 andExpr m n
         boundVariables = getBoundVariables n `union` getBoundVariables m `union` getBoundVariables true
         freeVariables = getFreshVariableStream boundVariables
 
-churchOr :: Expr  -> Expr -> Expr
+churchOr :: Expr -> Expr -> Expr
 churchOr m n = app2 orExpr m n
     where
         -- We need ChurchBoolTy (ChurchBoolTy a) since first argument is a HOF
@@ -148,7 +148,9 @@ unitTests = [
     normalise (churchAnd (churchNot true) (churchOr false true)) == normalise false,
     normalise (churchAnd (churchNot false) (churchOr false true)) == normalise true,
     normalise (churchAnd (churchAnd true true) (churchOr false true)) == normalise true,
-    normalise (churchAnd (churchAnd true true) (churchOr false false)) == normalise false
+    normalise (churchAnd (churchAnd true true) (churchOr false false)) == normalise false,
+    normalise (ExpApp (ExpLam "x" (ExpVar "y")) (ExpVar "z")) == normalise (ExpVar "y"),
+    normalise (ExpApp identity (ExpVar "z")) == normalise (ExpVar "z")
   ]
 
 allTestsPassed :: Bool
