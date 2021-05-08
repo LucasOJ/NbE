@@ -1,5 +1,5 @@
 
-module Untyped.DeBruijnNbE (normaliseDbExpr) where 
+module Untyped.DeBruijnNbE (normaliseDbExpr, normalise) where 
 import Prelude hiding ( lookup, empty )
 import Data.Map (  insert, Map, mapKeys, lookup, size)
 import qualified Data.Map as Map ( fromList, empty )
@@ -12,12 +12,12 @@ import Untyped.TypeDeclarations
 -- Expressions with no reductions
 data NormalForm = NfNeutralForm NeutralForm
                 | NfLam NormalForm
-    deriving (Read, Show)
+    deriving (Read, Show, Eq)
 
 -- Expressions that can be reified (also contain no reductions)
 data NeutralForm = NeVar Int
                  | NeApp NeutralForm NormalForm
-    deriving (Read, Show)
+    deriving (Read, Show, Eq)
 
 -- Semantics
 data V = Neutral NeutralV
@@ -115,11 +115,8 @@ normaliseExpr expr = (deBruijnExprToExpr indexToName freshVariableStream
 identity :: DbExpr 
 identity = DbLam (DbVar 0)
 
+k :: DbExpr 
+k = DbLam (DbLam (DbVar 1))
+
 k1 :: DbExpr 
-k1 = DbLam (DbLam (DbVar 1))
-
-k2 :: DbExpr 
-k2 = DbLam (DbLam (DbVar 0))
-
-omega :: Expr 
-omega = ExpApp (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x"))) (ExpLam "x" (ExpApp (ExpVar "x") (ExpVar "x")))
+k1 = DbLam (DbLam (DbVar 0))

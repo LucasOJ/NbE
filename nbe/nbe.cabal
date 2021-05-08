@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ef692004cff9c4614781761ffb941c59c3d66138f1cd21b68a1efa84d977eb40
+-- hash: 305f69783392d4b2e9b2a1a0dabd71f821477b3bdf1d16e2d58a83b5e5ce39a6
 
 name:           nbe
 version:        0.1.0.0
@@ -70,6 +70,7 @@ test-suite nbe-test
   other-modules:
       MonotypedTests.ChurchBooleans
       MonotypedTests.ChurchNumerals
+      UntypedTests.DeBruijnNbE
       UntypedTests.GensymNbE
       Paths_nbe
   hs-source-dirs:

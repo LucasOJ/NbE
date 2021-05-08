@@ -136,8 +136,8 @@ churchNot n = ExpApp notExpr n
 
 --- Unit tests
 
-unit_tests :: [Bool]
-unit_tests = [
+unitTests :: [Bool]
+unitTests = [
     prop_mult 5 8,
     prop_mult 32 566,
     prop_add 3 5,
@@ -151,8 +151,8 @@ unit_tests = [
     normalise (churchAnd (churchAnd true true) (churchOr false false)) == normalise false
   ]
 
-all_tests_passed :: Bool
-all_tests_passed = and unit_tests
+allTestsPassed :: Bool
+allTestsPassed = and unitTests
 
 --- Combinators
 
