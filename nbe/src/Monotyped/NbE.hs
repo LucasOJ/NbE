@@ -9,6 +9,7 @@ module Monotyped.NbE (
     ClosedExpr,
     normalise,
     normaliseDB,
+    normalToDB,
     SingTy
 ) where 
 

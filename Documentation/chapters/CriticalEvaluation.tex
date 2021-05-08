@@ -26,14 +26,92 @@
 % in a suitable manner.
 
 \section{Testing}
+\label{section:testing}
+
+In all our implementations, the type system ensures that \code{normalise} returns a normal form, however it is not guaranteed that it is the correct normal form for the given term. Although producing such a guarantee is out of the scope of this project, in this section we validate our implementations with unit tests.
+
+We discuss the testing of the STLC NbE implementation, but testing for the de Bruijn and Gensym NbE implementations can be easily derived by removing the types and changing the term syntax of our tests. Testing for all three implementations is included in the full source code. 
+
+To test \code{normalise}, we want to generate large, well-typed expressions with many redexes to contract. We choose the Church numerals and operations on them as it is easy to construct large terms with predictable normal forms. The Church numerals are a representation of the non-negative integers in the lambda calculus of the form $\lambda f x . f (f \dots (f x) \dots)$, where the numeral $n$ is encoded by $n$ applications of $f$ \cite{churchEncodings}.  
+
+\begin{lstlisting}
+    type ChurchNumeralTy = ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy)
+
+    type ChurchNumeral = Expr '[] ChurchNumeralTy
+\end{lstlisting}
+
+We define the type \code{ChurchNumeralTy} as the concrete type of Church numerals in the \code{Expr} syntax, where \code{BaseTy :-> BaseTy} is the type of the function $f$, and \code{BaseTy} is the type of its argument \code{x}. Instead of \code{BaseTy}, we could have used any type as the encoding only depends on the strucuture of the term. However, in our implementation to satisfy \code{SingTy} constraints we must choose a concrete type rather than a type variable. It makes sense to use the simplest type possible to avoid additional complexity. We also have to choose a concrete context to satisfy the \code{SingContext} constraints. Since Church numerals contain no free variables, we specify that our encoding of the Church numerals have an empty initial context in the definition of the type alias \code{ChurchNumeral}. 
+
+\begin{lstlisting}
+    app2 :: Expr ctx (a :-> b :-> c) -> Expr ctx a -> Expr ctx b -> Expr ctx c
+    app2 f x y = App (App f x) y 
+
+    toChurchNumeral :: Int -> ChurchNumeral
+    toChurchNumeral 0 = Lam (Lam (Var Head))
+    toChurchNumeral i = App churchSucc (toChurchNumeral (i - 1)) 
+        where
+
+            churchSucc :: Expr '[] (ChurchNumeralTy :-> ChurchNumeralTy)
+            churchSucc = Lam (Lam (Lam (App f (app2 n f x))))
+
+            n = Var (Tail (Tail Head))
+            f = Var (Tail Head)
+            x = Var Head
+\end{lstlisting}
+
+We use the \code{toChurchNumeral} function to create an expression that takes an \code{Int} \code{i} and produces an expression which will normalise to \code{i}th Church numeral. It does this by repeatedly applying the successor term \code{churchSucc} in the syntax. \code{normalise} will contract these redexes to produce a Church numeral, since Church numerals are already in normal form. 
+
+For example, \code{toChurchNumeral 2} produces the following complicated expression.
+
+\begin{lstlisting}
+    App (Lam (Lam (Lam (App (Var 1) (App (App (Var 2) (Var 1)) (Var 0)))))) 
+    (App (Lam (Lam (Lam (App (Var 1) (App (App (Var 2) (Var 1)) (Var 0)))))) 
+    (Lam (Lam (Var 0))))
+\end{lstlisting}
+
+where we have replaced \code{Elem} variables with de Bruijn indices for brevity. However, when we normalise the above term we get
+
+\begin{lstlisting}
+    Lam (Lam (App (Var 1) (App (Var 1) (Var 0))))
+\end{lstlisting}
+
+which we recognise as the Church numeral for 2, $\lambda f x . f (f x)$. This is encouraging evidence that \code{normalise} is working correctly for larger terms. Since we can generate Church numerals, we define operations on them to build more complex terms.
+
+\begin{lstlisting}
+    addChurchNumeral :: ChurchNumeral -> ChurchNumeral -> ChurchNumeral
+    addChurchNumeral = app2 churchAdd
+        where 
+            churchAdd :: ClosedExpr (ChurchNumeralTy :-> ChurchNumeralTy :-> ChurchNumeralTy)
+            churchAdd = Lam (Lam (Lam (Lam (app2 m f (app2 n f x)))))
+
+            m = Var (Tail (Tail (Tail Head)))
+            n = Var (Tail (Tail Head))
+            f = Var (Tail Head)
+            x = Var Head 
+\end{lstlisting}
+
+The \code{addChurchNumeral} function applies the syntactic Church addition combinator \code{churchAdd} to two Church numerals. To verify that \code{normalise} is working correctly, we can verify that addition in the Church encoding using \code{normalise} matches standard addition. 
+
+\begin{lstlisting}
+    prop_add :: Int -> Int -> Bool
+    prop_add m n = normaliseDB (addChurchNumeral (toChurchNumeral m) (toChurchNumeral n)) 
+                == normaliseDB (toChurchNumeral (m + n))
+\end{lstlisting}
+
+\code{prop_add} represents the desired property that for any two non-negative integers \code{n} and \code{m}, adding their Church numerals and normalising the result yields the same expression as adding the integers and normalising the Church numeral. This function returns \code{True} for all non-negative values of \code{n} and \code{m} provided, which is strong evidence that \code{normalise} is producing the correct normal form. Notice that we use \code{normaliseDB} in our property, which first normalises the expression as usual using \code{normalise}, but then converts it into a de Bruijn expression. We do this because \code{Expr} is not part of the \code{Eq} class, for reasons we explore in Section \ref{subsect:GADTanalysis}
+
+We developed a similar property for Church multiplication. Additionally, we verified that \code{normalise} could evaluate expressions constructed using the Church boolean encoding.
 
 \section{Evaluation of Language Features}
 
+In this section we evaluate how well Haskell's advanced language features worked during the implementation of NbE for the STLC. We also generalise our experiences to consider whether these features would be useful for general-purpose programming in Haskell, and what issues could prevent their use.
+
 \subsection{GADTs}
+\label{subsect:GADTanalysis}
 
 We found that \code{GADTs} is an excellent extension for emulating dependent types when combined with \code{PolyKinds}. GADT syntax allowed us to define types \code{Expr} with much greater precision and enabled us to translate Agda \code{data} definitions such as \code{OPE} and type generating functions such as $\text{Ty}^\text{N}$, that otherwise could not be expressed in Haskell.
 
-However, during the analysis and testing of our implementation, we found that GADTs indexed by types can create difficulties for deriving useful class instances. For example, it would be desirable for \code{NormalForm} to be a member of the \code{Eq} class, so that during testing we could directly check if two normal forms are equal. 
+However, during the analysis and testing of our implementation, we found that GADTs indexed by types can create difficulties for deriving useful class instances. For example, it would be desirable for \code{NormalForm} to be a member of the \code{Eq} class, so that during testing we could directly check if two normal forms are equal (see Section \ref{section:testing}). 
 
 \begin{lstlisting}
     instance Eq (NeutralForm ctx ty) where
@@ -46,14 +124,15 @@ However, during the analysis and testing of our implementation, we found that GA
 
 Here we have attempted to implement an \code{Eq} instance for \code{NeutralForm}, which is needed to determine equality between normal forms. The variable case doesn't pose any problems, as GHC can automatically derive an \code{Eq} instance for \code{Elem}. However, in the application case we cannot be sure that \code{arg1} and \code{arg2} are equal, since they are universally quantified type variables. Because of this, \code{n} and \code{x} may have different types, and so we cannot determine equality between them. Thus, the instance fails to compile.
 
-We attempted to benchmark the typed NbE implementation, to evaluate how much performance overhead the additional type information incurred compared to the untyped implementation. However, to use Haskell's benchmarking features, we need a \code{NormalForm} instance for the \code{NFData} class. As \code{NormalForm} is a GADT, GHC is unable to automatically derive the instance. This further exemplifies how the class limitation makes GADTs more difficult to work with, and it would be interesting to explore whether this limitation could be overcome.
+We attempted to benchmark the typed NbE implementation, to evaluate how much performance overhead the additional type information incurred compared to the untyped implementations. However, to use Haskell's benchmarking features, we need a \code{NormalForm} instance for the \code{NFData} class. As \code{NormalForm} is a GADT, GHC is unable to automatically derive the instance. This further exemplifies how the class limitation makes GADTs more difficult to work with, and it would be interesting to explore whether this limitation could be overcome.
 
-In general, we believe that GADTs are a useful tool for Haskell developers to improve the type-safety of their programs by taking advantage of the programs as proof paradigm. However, the instance deriving limitation shows that the extension is not completely mature yet.
+In general, we believe that GADTs are a useful tool for Haskell developers to improve the type-safety of their programs by taking advantage of the programs as proof paradigm. However, the instance deriving limitation shows that the extension is not completely mature yet. 
 
 \subsection{Dependent Pattern Matching}
 
-For our implementation, the class instance trick for performing dependent pattern matching on types worked well. Passing singleton class constraints through the program did add syntactic noise and required some thought, but passing constraints through type signatures had no effect on the function implementations. In some situations we were forced to add type constraints to data types themselves. 
-% TODO: Needs type annotation, implementation has effect on data, not nice.
+For our implementation, the class instance trick for performing dependent pattern matching on types worked well. Passing singleton class constraints through the program did add syntactic noise and required some thought, but passing constraints through function type signatures had no effect on the function implementations. 
+
+However, in some situations we were forced to add type constraints to data types themselves. For example, we had to add a \code{SingTy arg} constraint to the \code{Lam} constructor. This is more concerning, as the implementation guided the structure of the data. For our project this was not an issue, but such a constraint could have implications on other functions, which reduces the code's modularity. For example, any function which produces a \code{Lam} value would have to ensure the argument type is a member of \code{SingTy}, even though this constraint is not relevant for the expression itself.
 
 Our boilerplate overhead was small, since we only needed dependent pattern matches for a few functions. However, as noted in Section \ref{sect:typedNormalisation} for more complex applications with many dependent pattern matches, this boilerplate could become more difficult to manage. The boilerplate was also compact since our implementation only required pattern matches on the structure of types. For example, \code{idOpe} only depended on the length of the type-level context, so there was no need to identify its contents. This meant we only used a portion of the singleton pattern, which can be used to extract all the type-level information into the value level, at the cost of additional boilerplate.
 

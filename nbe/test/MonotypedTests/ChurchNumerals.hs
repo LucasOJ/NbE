@@ -7,7 +7,8 @@ import Monotyped.NbE (
     Ty(..), 
     Elem(..), 
     normaliseDB,
-    normalise
+    normalise,
+    normalToDB
     )
 
 type ChurchNumeralTy = ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy)
@@ -41,7 +42,8 @@ addChurchNumeral = app2 churchAdd
         x = Var Head 
 
 prop_add :: Int -> Int -> Bool 
-prop_add m n = normaliseDB (addChurchNumeral (toChurchNumeral m) (toChurchNumeral n)) == normaliseDB (toChurchNumeral (m + n))
+prop_add m n = normaliseDB (addChurchNumeral (toChurchNumeral m) (toChurchNumeral n)) 
+            == normaliseDB (toChurchNumeral (m + n))
 
 multChurchNumeral :: ChurchNumeral -> ChurchNumeral -> ChurchNumeral
 multChurchNumeral = app2 churchMult
