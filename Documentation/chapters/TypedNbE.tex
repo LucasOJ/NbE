@@ -32,7 +32,7 @@ We construct the set of the simply typed normal terms \code{NormalForm} by combi
 
 \section{Order Preserving Embeddings}
 
-In the lambda case of \code{eval}, NbE evaluates the body of the lambda in a stronger context where a new bound variable is introduced (as seen in Chapter \ref{chap:untypednbe}). To continue the evaluation of the body ...
+Following Kovacs' implementation, before we can define the semantic set we need a datatype to represent Order Preserving Embeddings (OPEs) on contexts.
 
 \begin{lstlisting}
     data OPE :: [Ty] -> [Ty] -> * where
@@ -41,7 +41,7 @@ In the lambda case of \code{eval}, NbE evaluates the body of the lambda in a str
         Keep  :: OPE ctx1 ctx2 -> OPE (x : ctx1) (x : ctx2)
 \end{lstlisting}
 
-A value of type \code{OPE a b} is a proof that the list of types \code{b} is a subsequence of \code{a}. The three constructors of \code{OPE} correspond to the different ways of constructing such a proof. The \code{Empty} constructor corresponds to the trivial statement that the empty list contains itself. Given a proof that \code{ctx2} is embedded in \code{ctx1}, the \code{Drop} constructor extends the proof to show that \code{ctx2} is embedded in \code{x:ctx1}, and the \code{Keep} constructor extends the proof to show that \code{x:ctx2} is embedded in \code{x:ctx1}. For example, \code{Drop (Keep Empty))} could have the (Haskell) type \code{OPE '[BaseTy :-> BaseTy, BaseTy] '[BaseTy]}. 
+A value of type \code{OPE a b} is a proof that the list of types \code{b} is a subsequence of \code{a}. The three constructors of \code{OPE} correspond to the different ways of constructing such a proof. The \code{Empty} constructor corresponds to the trivial statement that the empty list contains itself. Given a proof that \code{ctx2} is embedded in \code{ctx1}, the \code{Drop} constructor extends the proof to show that \code{ctx2} is embedded in \code{x:ctx1}, and the \code{Keep} constructor extends the proof to show that \code{x:ctx2} is embedded in \code{x:ctx1}. For example, \code{Drop (Keep Empty))} could have the type \code{OPE '[BaseTy :-> BaseTy, BaseTy] '[BaseTy]}. 
 
 From a programs as proof perspective, \code{OPE} is a binary relation on the set of contexts.
 
@@ -62,18 +62,18 @@ From a programs as proof perspective, \code{OPE} is a binary relation on the set
 
 % The \code{normalise} function should return a \code{NormalForm} with the same type and typing context as the original term, so should have the type signature \code{Expr ctx ty $\rightarrow$ NormalForm ctx ty}. Because \code{reify} is a pure function of the semantic set \code{V}, this set must also be indexed by the typing context and type of the expression to preserve the type information needed to verify a term is well-typed (as seen in the kind signature below). 
 
-In Andras Kovacs' implementation of NbE \cite{AgdaNbe}, the type of the semantic set is determined by the function $\text{Ty}^\text{N}$. This function takes a type and context expression as values, and returns the type of the corresponding semantic set, where \code{Set} can be thought of as kind \code{*}. In Haskell we do not have a way to directly express a function which takes values and returns types. Instead we define the GADT \code{V} which represents the typed semantic set.
+In Andras Kovacs' implementation of NbE \cite{AgdaNbe}, the type of the semantic set is determined by the function $\text{Ty}^\text{N}$. This function takes the type and context of an expression as values, and returns the type of the corresponding semantic set, where \code{Set} can be thought of as kind \code{*}. In Haskell we do not have a way to directly express a function which takes values and returns types. Instead we define the GADT \code{V} which represents the typed semantic set.
 
 \begin{lstlisting}
     data V :: [Ty] -> Ty -> * where 
-        Base :: NormalExpr ctx BaseTy -> V ctx BaseTy
+        Base :: NormalExpr ctx 'BaseTy -> V ctx 'BaseTy
         Function :: (forall ctx' .  OPE ctx' ctx -> V ctx' arg -> V ctx' result) 
                  -> V ctx (arg :-> result)
 \end{lstlisting}
 
-\code{V} is indexed by a context of kind \code{[Ty]} and a type of kind \code{Ty}, which were value-level function arguments in \ref{fig:agdaSemanticSet}. \code{V} is necessarily indexed by these parameters at the type level since \code{normalise} should return a normal form with the same context and type as the given syntactic expression. \code{reify} is a pure function of the semantic set, so \code{V} must preserve this type-level information. 
+\code{V} is indexed by a context of kind \code{[Ty]} and a type of kind \code{Ty}, which were value-level function arguments in Figure \ref{fig:agdaSemanticSet}. \code{V} is necessarily indexed by these parameters at the type level since \code{normalise} should return a normal form with the same context and type as the given syntactic expression. \code{reify} is a pure function of the semantic set, so \code{V} must preserve this type-level information. 
 
-$\text{Ty}^\text{N}$ pattern matches on the type argument and is defined in two cases: a base type case and a function case, where the Agda implementation uses $\iota$ for \code{BaseTy}. In our implementation the expression type is not given as a value-level argument that can be pattern matched on, so instead we use constructors to emulate a similar behaviour. From the return type of the constructors we see that values of \code{V} with type \code{BaseTy} can only be created by the \code{Base} constructor. Thus, if we are given a value of type \code{V ctx BaseTy}, GHC can deduce the value takes the form \code{Base n} where \code{n :: NormalExpr ctx Expr}. \code{n} is an inhabitant of the type returned by the Agda implementation in the base type case. 
+$\text{Ty}^\text{N}$ pattern matches on the type argument and is defined in two cases: a base type case and a function case, where the Agda implementation uses $\iota$ for \code{BaseTy}. In our implementation the expression type is not given as a value-level argument that can be pattern matched on, so instead we use constructors to emulate a similar behaviour. From the return type of the constructors we see that values of \code{V} with type \code{BaseTy} can only be created by the \code{Base} constructor. Thus, if we are given a value of type \code{V ctx 'BaseTy}, GHC can deduce the value takes the form \code{Base n} where \code{n :: NormalExpr ctx Expr}. \code{n} is an inhabitant of the type returned by the Agda implementation in the base type case. 
 Similarly, given a value of type \code{V ctx (A :-> B)}, GHC can deduce that the value must have the form \code{Function f}, since only the \code{Function} constructor can produce semantic values with function type. Again, we can extract a semantic value of the correct type since the type of \code{f} is exactly the type specified by the function type case of $\text{Ty}^\text{N}$. Thus, we have successfully mimicked the behaviour of $\text{Ty}^\text{N}$ in Haskell.
 
 % TODO: Limitations of above technique
@@ -83,7 +83,7 @@ The argument to the \code{Function} constructor has following the type signature
     forall ctx' . OPE ctx' ctx -> V ctx' arg -> V ctx' result 
 \end{lstlisting}
 
-By default, in GHC, there is only have one “level” of polymorphism, where type variables are implicitly universally quantified. However, as seen in \ref{fig:agdaSemanticSet}, we want to treat \code{ctx} as fixed, before quantifying over \code{ctx'}, where we use \code{ctx} instead of $\Gamma$ and \code{ctx'} instead of $\Delta$.
+By default, in GHC, there is only have one “level” of polymorphism, where type variables are implicitly universally quantified. However, as seen in Figure \ref{fig:agdaSemanticSet}, we want to treat \code{ctx} as fixed, before quantifying over \code{ctx'}, where we use \code{ctx} instead of $\Gamma$ and \code{ctx'} instead of $\Delta$.
 % Those with OPE to original context
 To achieve this we use higher-ranked polymorphism with the explicit \code{forall} syntax to delay the quantification of \code{ctx'} until after \code{ctx} has been bound. To enable higher ranked polymorphism, we use the \code{Rank2Types} extension. 
 
@@ -136,11 +136,11 @@ As before, we pattern match on each of the three expression constructors. We sta
 
 As in the untyped case, for variables we lookup the semantic value associated with the bound variable from the environment. Since variables are indexed by an \code{Elem} value, \code{envLookup} takes an \code{Elem} value and returns the associated semantic value.
 
-The additional type information allows us to make guarantees about the lookup. Since \code{n} is a value of type \code{Elem ctx ty}, we know that \code{ty} exists somewhere in the list \code{ctx}. Since \code{Env} is also indexed by the same context \code{ctx}, which tracks the types of the semantic values in the environment, it is guaranteed that the semantic value at the corresponding de Bruijn index exists in the environment with type \code{ty}. Thus, \code{envLookup} doesn't have to handle the case where the variable is not in the environment like in the untyped implementation; the types guarantee that all variables possible in the context \code{ctx} are bound in the environment.
+The additional type information encoded in \code{Env} allows us to make guarantees about the lookup. Since \code{n} is a value of type \code{Elem ctx ty}, we know that \code{ty} exists somewhere in the list \code{ctx}. Since \code{Env} is also indexed by the same context \code{ctx}, which tracks the types of the semantic values in the environment, it is guaranteed that the semantic value at the corresponding de Bruijn index exists in the environment with type \code{ty}. Thus, \code{envLookup} doesn't have to handle the case where the variable is not in the environment like in the untyped implementation; the types guarantee that all variables possible in the context \code{ctx} are bound in the environment.
 
 Since all semantic values in the environment have the same typing context \code{ctxV}, we can also be sure that the returned semantic value has the context \code{ctxV}.
 
-Note that \code{envLookup} does not pattern matched on the \code{EmptyEnv} case. The types ensure that this case is never required since \code{EmptyEnv} has type \code{Env '[] ctxV}, and there are no inhabitants of the type \code{Elem '[] x} for any \code{x}. Here \code{Elem ctx ty} acts like a pre-condition on \code{envLookup}.
+Note that \code{envLookup} does not pattern match on the \code{EmptyEnv} case. The types ensure that this case is never required since \code{EmptyEnv} has type \code{Env '[] ctxV}, and there are no inhabitants of the type \code{Elem '[] x} for any \code{x}. Here \code{Elem ctx ty} acts like a pre-condition on \code{envLookup}.
 
 % TODO: Why return into ctxV?
 
@@ -157,7 +157,7 @@ Before implementing the lambda case of \code{eval} we define the function \code{
 \end{lstlisting}
 
 First we strengthen \code{Elem} values which index variables. We use the naming convention \code{OPE strong weak} since \code{strong} contains at least as many bindings as \code{weak}. 
-Intuitively if \code{ty} is an element of the context \code{weak}, then it is also an element of any context \code{strong} containing \code{weak}.
+We can perform this context strengthening since if \code{ty} is an element of the context \code{weak}, then it is also an element of any context \code{strong} containing \code{weak}.
 
 % TODO: Rephrase above
 
@@ -175,7 +175,7 @@ Intuitively if \code{ty} is an element of the context \code{weak}, then it is al
 
 \end{lstlisting}
 
-\code{strengthenNeutral} and \code{strengthenNormal} strengthen entire expressions. Intuitively any well-typed expression in one context should also be well-typed in any larger context containing original, since adding variable bindings will not invalidate existing type judgements. \code{strengthenNormal} essentially encodes weakening for the normal form subset of the STLC. 
+\code{strengthenNeutral} and \code{strengthenNormal} strengthen entire expressions. Intuitively any well-typed expression in one context should also be well-typed in any larger context containing original, since adding variable bindings will not invalidate existing type judgements. \code{strengthenNormal} essentially encodes the weakening property for the normal form subset of the STLC. 
 
 In the \code{NormalLam} case, type refinement guarantees that the context for the body of the lambda binds an additional variable. Hence, we have to expand the given OPE with an additional \code{Keep}. In the \code{strengthenNeutral} case we use \code{strengthenElem} to point variables to their updated de Bruijn indices in the expanded context.
 
@@ -213,7 +213,7 @@ However, GHC automatically infers that \code{f' :: OPE Any strong -> V Any arg -
                 f' ope' = f (composeOPEs ope ope')
 \end{lstlisting}
 
-To resolve this issue we use type annotations, which are enabled by the \code{ScopedTypeVariables} extension. \code{ope :: OPE strong weak} binds the type variables \code{strong} and \code{weak} in the body of the case. We also bind the type variables for the constructor argument \code{f}. In the automatically inferred type signature for \code{f'}, \code{arg} and \code{result} were universally quantified. In the new type-annotated implementation, these type-variables are bound to the types of the arguments. We can then use these bound variables to specify the type of \code{f'}, where we explicitly declare that the contexts inferred as \code{Any} must be the same context \code{stronger}. With this additional type information, type-checking succeeds and the program compiles.
+To resolve this issue we use type annotations, which are enabled by the \code{ScopedTypeVariables} extension. \code{ope :: OPE strong weak} binds the type variables \code{strong} and \code{weak} in the body of the case. We also bind the type variables for the constructor argument \code{f}. We can then use these bound variables to specify the type of \code{f'}, where we explicitly declare that the contexts inferred as \code{Any} must be the same context \code{strongest}. With this additional type information, type-checking succeeds and the program compiles.
 
 \begin{lstlisting}
     strengthenEnv :: OPE ctxV' ctxV -> Env ctx ctxV -> Env ctx ctxV'
@@ -233,7 +233,13 @@ Now we are ready to implement the lambda case of the \code{eval} function.
 
 As in the untyped implementation, in the lambda case \code{eval} returns a semantic function that maps from a semantic argument \code{v} to the evaluated body of the lambda. We evaluate the body in an updated environment where we have bound the variable \code{Var Head} to \code{v}. However, if \code{ope :: ctxV' ctxV} then \code{v} has the context \code{ctxV'} whereas all the elements of \code{env} have context \code{ctxV}, so we cannot immediately add \code{v} to \code{env}. Instead, we have to strengthen the contexts of all the elements of the \code{env} using the given \code{ope} argument and \code{strengthenEnv}, which yields the strengthened environment of type \code{Env ctx ctxV'}. Now the contexts of the elements of the modified environment match the context \code{ctxV'} of \code{v}, so we can add \code{v} to the modified environment. 
 
-As in the \code{Function} case of \code{strengthenV}, the type of \code{f} that GHC infers is \code{OPE Any ctxV -> V Any arg -> V Any result}, which is too general and causes compilation to fail at type-checking.
+As in the \code{Function} case of \code{strengthenV}, the type of \code{f} that GHC infers is 
+
+\begin{lstlisting}
+    OPE Any ctxV -> V Any arg -> V Any result
+\end{lstlisting}
+
+which is too general and causes compilation to fail at type-checking.
 
 \begin{lstlisting}
     eval (env :: Env ctx ctxV) (Lam (body :: Expr (arg:ctx) result)) = Function f 
@@ -254,7 +260,7 @@ Once we have annotated the argument types, type-checking and compilation succeed
     \label{fig:agdaIdOPE}
 \end{figure}
 
-Before implementing the lambda case of \code{eval}, we need to define the identity \code{OPE} function from figure \ref{fig:agdaIdOPE} in Haskell. This function pattern matches on the type-level context $\Gamma$ and produces the identity \code{OPE} proving that $\Gamma$ is contained in $\Gamma$. This is known as a dependent pattern match, as the result of the function is dependent of the type of its arguments. In Haskell, standard functions cannot pattern match on types, so we use an alternative construction, inspired by the singleton pattern \cite{singletons}, to pattern match at the type level
+Before implementing the lambda case of \code{eval}, we need to define the identity \code{OPE} function from Figure \ref{fig:agdaIdOPE} in Haskell. This function pattern matches on the type-level context $\Gamma$ and produces the identity \code{OPE} proving that $\Gamma$ is contained in $\Gamma$. This is known as a dependent pattern match, as the result of the function is dependent of the type of its arguments. In Haskell, standard functions cannot pattern match on types, so we use an alternative construction, inspired by the singleton pattern \cite{singletons}, to pattern match at the type level.
 
 % IDEAS: Functionality, Agda implementation, why not in Haskell, solution, how works (runtime-lookup), limitations?
 
@@ -271,7 +277,7 @@ Before implementing the lambda case of \code{eval}, we need to define the identi
         idOpe = Keep idOpe
 \end{lstlisting}
 
-We create a class \code{SingContext} with a single method \code{idOpe}, which will return the identity \code{OPE} for the context \code{ctx}. We then use class instances to pattern match on the type of \code{ctx}. In the empty context case, \code{idOpe} returns the \code{Empty} \code{OPE}. In the \code{x:xs} case, we require that the type \code{xs} has a \code{SingContext} instance which grants us the ability to use the \code{idOpe :: OPE xs xs} function in the class instance. Applying the \code{OPE} for the tail of the list to the \code{Keep} constructor produces the identity \code{OPE} for the whole list. 
+We create a class \code{SingContext} with a single method \code{idOpe}, which will return the identity \code{OPE} for the context \code{ctx}. We then use class instances to pattern match on the type of \code{ctx}. In the empty context case, \code{idOpe} returns the \code{Empty} \code{OPE}. In the \code{x:xs} case, we require that the type \code{xs} has a \code{SingContext} instance which grants us the ability to use the \code{idOpe :: OPE xs xs} function in the instance definition. Applying the \code{OPE} for the tail of the list to the \code{Keep} constructor produces the identity \code{OPE} for the whole list. 
 
 The class instances essentially form a map from types to implementations of \code{idOpe}. Since \code{ctx} is a type variable that might not be known until runtime, the process of resolving the correct implementation to use could take place at runtime. This is surprising given that without extensions, GHC erases all type information during compilation. 
 
@@ -296,7 +302,7 @@ We first evaluate both terms of the application into the semantics, and then per
 
 From the definition of \code{Function}, we can evaluate our function with a semantic argument in any context stronger than \code{ctxV}, where the \code{OPE} argument is a witness to the stronger context.
 % TODO: Rephrase above
-Since \code{a'} has the same context \code{ctxV} as \code{Function f'}, we evaluate the semantic function \code{f'} at \code{ctxV} by choosing the \code{OPE} of type \code{OPE ctxV ctxV}. We produce such a value using the \code{idOPEFromEnv} function. This function takes an environment but throws away the value since the only information needed to produce the \code{OPE} is the type-level semantic context \code{ctxV}. The \code{SingContext ctxV} constraint awards us the \code{idOPE :: OPE ctxV ctxV} function, which handles the type level pattern match on \code{ctxV} and produces the identity \code{OPE} of \code{ctxV}. 
+Since \code{n'} has the same context \code{ctxV} as \code{Function f'}, we evaluate the semantic function \code{f'} at \code{ctxV} by choosing the \code{OPE} of type \code{OPE ctxV ctxV}. We produce such a value using the \code{idOPEFromEnv} function. This function takes an environment but throws away the value since the only information needed to produce the \code{OPE} is the type-level semantic context \code{ctxV}. The \code{SingContext ctxV} constraint awards us the \code{idOPE :: OPE ctxV ctxV} function, which handles the type level pattern match on \code{ctxV} and produces the identity \code{OPE} of \code{ctxV}. 
 
 To ensure that \code{ctxV} is an element of the \code{SingContext} class, we add the same constraint to \code{eval}'s type signature to give \code{eval :: (SingContext ctxV) => Env ctx ctxV -> Expr ctx ty -> V ctxV ty}. 
 Without this additional constraint, GHC cannot be sure that \code{ctxV} is a member of the \code{SingContext} class, so the constraint on \code{idOPEFromEnv} is not satisfied, and compilation fails. However, any function that uses \code{eval} now also has to prove that \code{ctxV} has a \code{SingContext} instance to satisfy \code{eval}'s constraint. By adding class constraints, we implicitly propagate this guarantee back through the call-stack. Eventually we reach a point where the \code{ctxV} variable is instantiated with a concrete type that GHC can infer has a \code{SingContext} instance, which it can't do for arbitrary type variables like \code{ctxV}. This adds boilerplate code to type signatures, but is necessary to ensure type-checking succeeds and does not impact the implementation of the functions themselves. For successful compilation we would need to retrofit previously defined code with the necessary class constraints, but since these constraints do not affect the operation of functions, we omit them for brevity.
@@ -325,7 +331,7 @@ Since semantic values with type \code{BaseTy} are normal forms, \code{reify} ret
     \label{fig:agdaEtaExpand}
 \end{figure}
 
-It would be desirable to normalise expressions into $\eta$-expanded normal form, where all the arguments of expressions with function type are abstracted. \code{etaExpand} is the function responsible for evaluating syntactic expressions into $\eta$-expanded semantic expressions. To implement \code{etaExpand} we follow the Agda definition in figure \ref{fig:agdaEtaExpand}, where we use \code{etaExpand} for $\text{u}^\text{N}$ and \code{reify} for $\text{q}^\text{N}$. $\text{u}^\text{N}$ pattern matches on the type \code{A} at the type-level. Since this is not possible directly in Haskell, we use the same class instance trick from the application case of \code{eval}. 
+It would be desirable to normalise expressions into $\eta$-expanded normal form, where all the arguments of expressions with function type are abstracted. \code{etaExpand} is the function responsible for evaluating syntactic expressions into $\eta$-expanded semantic expressions. To implement \code{etaExpand} we follow the Agda definition in Figure \ref{fig:agdaEtaExpand}, where we use \code{etaExpand} for $\text{u}^\text{N}$ and \code{reify} for $\text{q}^\text{N}$. $\text{u}^\text{N}$ pattern matches on the type \code{A} at the type-level. Since this is not possible directly in Haskell, we use the same class instance trick from the application case of \code{eval}. 
 
 \begin{lstlisting}
     class SingTy ty where
@@ -341,7 +347,7 @@ It would be desirable to normalise expressions into $\eta$-expanded normal form,
                 f ope v = etaExpand (NeutralApp (strengthenNeutral ope n) (reify v))  
 \end{lstlisting}
 
-We create a class \code{SingTy} with a single function \code{etaExpand}, where the type of the neutral form is bound to the type \code{ty} parameterising the class. The \code{'BaseTy} instance is applied when the argument \code{n} is an expression of type \code{BaseTy}. In the body of the instance, GHC infers that \code{n :: NeutralForm ctx 'BaseTy}, which allows us to apply the \code{Base} constructor. The \code{:->} instance is applied when \code{n} has a function type. In this case we use type annotations again since the automatically inferred type of \code{f} is too general for successful compilation. This annotation also shows us that in the function case, GHC is able to infer that \code{n :: NeutralForm ctx (arg :-> result)}. In this instance, \code{etaExpand} returns a function, which will eventually be reified into a lambda. However, the body of this function may itself may require $\eta$-expansion, depending on the type \code{arg} of the argument \code{v}. Since the \code{NeutralApp} constructor creates a neutral value of type \code{result}, we require that \code{result} also has a \code{SingTy} instance in the instance declaration.
+We create a class \code{SingTy} with a single function \code{etaExpand}, where the type of the neutral form is bound to the type \code{ty} parameterising the class. The \code{'BaseTy} instance is used when the argument \code{n} is an expression of type \code{BaseTy}. In the body of the instance, GHC infers that \code{n :: NeutralForm ctx 'BaseTy}, which allows us to apply the \code{Base} constructor. The \code{:->} instance is used when \code{n} has a function type. In this case we use type annotations again since the automatically inferred type of \code{f} is too general for successful compilation. This annotation also shows us that in the function case, GHC is able to infer that \code{n :: NeutralForm ctx (arg :-> result)}. In this instance, \code{etaExpand} returns a function, which will eventually be reified into a lambda. However, the body of this function may itself may require $\eta$-expansion, depending on the type \code{arg} of the argument \code{v}. Since the \code{NeutralApp} constructor creates a neutral value of type \code{result}, \code{etaExpand} requires that \code{result} also has a \code{SingTy} instance in the instance declaration.
 
 In the untyped implementation of NbE, evaluation and reification take place in two distinct phases. However, from the definition of \code{etaExpand} we see that in the typed implementation, expressions are bounced back and forth between syntactic and semantic representations. This makes the implementation more difficult to reason about, but is a necessary trade-off to achieve the additional type security and features such as $\eta$-expansion that the typed implementation provides.
 
@@ -365,7 +371,7 @@ We extend the existing class \code{SingContext} to include \code{bindOpe}, which
             extendOpe _ = bindOpe 
 \end{lstlisting}
 
-To reify a function \code{f :: OPE ctx' ctx -> V ctx' arg -> V ctx' result}, we evaluate the \code{f} at a semantic bound variable, and reify the result (which represents the body of the function \code{f}). \code{boundVar} has the type \code{V (arg:ctx) arg}, so we use the \code{extendedOpe} function to produce an \code{OPE} for a context where we have bound an additional variable of type \code{arg} in the context. All instances of the argument in the body of \code{f} are replaced with \code{etaExpand (NeutralVar Head)}. From the definition of \code{etaExpand}, we see that if \code{NeutralVar Head} has type \code{BaseTy}, \code{etaExpand} can immediately evaluate the variable into the semantic set. On the other hand, if \code{NeutralVar Head} has a function type, \code{etaExpand} evaluates to a function which waits for an argument to be given before continuing evaluation.
+To reify a function \code{f :: OPE ctx' ctx -> V ctx' arg -> V ctx' result}, we evaluate the \code{f} at a semantic bound variable, and reify the result (which represents the body of the function \code{f}). \code{boundVar} has the type \code{V (arg:ctx) arg}, so we use the \code{extendedOpe} function to produce an \code{OPE} for a context where we have bound an additional variable of type \code{arg} in the context. All instances of the argument in the body of \code{f} are replaced with \code{etaExpand (NeutralVar Head)}. From the definition of \code{etaExpand}, we see that if \code{NeutralVar Head} has type \code{BaseTy}, \code{etaExpand} can immediately evaluate the variable into the semantic set. On the other hand, if \code{NeutralVar Head} has a function type, \code{etaExpand} evaluates to a function which waits for an argument to be supplied before continuing evaluation of the variable.
 
 The other section of the program where we evaluate a semantic function \code{f} is the application case of \code{eval} (see Section \ref{subsect:typedEvalAppCase}). These cases motivate the use of \code{OPE}s, since in the application case we need to evaluate \code{f} in the same context as the semantic value, whereas in this case we need to evaluate \code{f} in an extended context where an additional bound variable is introduced. Whilst \code{OPE}s are responsible for a significant amount of the additional work in implementing well-typed normaliation, they are an elegant solution to evaluating semantic functions in different contexts.
 

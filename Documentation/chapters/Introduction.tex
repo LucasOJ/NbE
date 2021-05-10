@@ -4,10 +4,10 @@
 % Start with want to implement functional language
 To implement a functional programming language, we need a normalisation function that maps each expression in the functional language to its normal form.
 % We use NbE
-In this dissertation we explore various implementations of normalisation by evaluation (NbE) for the lambda calculus.
+In this dissertation we explore various implementations of Normalisation by Evaluation (NbE) for the lambda calculus.
 
 % What/how it works roughly
-NbE proceeds by interpreting terms of the lambda calculus (referred to as “syntax”) as elements of a mathematical “semantic” set, where computation is easier to perform. NbE then “reifies” semantic values back into the set of normal terms. All $\beta$-equal terms “evaluate” to the same semantic value, so $\beta$-equal terms normalise to the same normal form.
+NbE proceeds by interpreting terms of the lambda calculus (referred to as “syntax”) as elements of a mathematical “semantic” set. NbE then “reifies” semantic values back into the set of normal terms. All $\beta$-equal terms “evaluate” to the same semantic value, so $\beta$-equal terms normalise to the same normal form.
 
 % Why do we care
     % Modern
@@ -16,28 +16,26 @@ NbE is a modern alternative to normalisation by reduction; a technique based on 
 \begin{enumerate}
     \item Since the foundations of NbE are mathematical, we can prove that our implementation is correct and study its behaviour formally \cite{AgdaNbe}. Proving that the implementations are fully correct is beyond the scope of this project, but we use types as machine-checked proof that our implementation satisfies certain properties.
     \item Some research suggests that NbE can improve the speed of compilation of functional languages \cite{efficientNbE}.
-    \item Research is ongoing into whether dependent type theories such as Coq can use NbE to check for equality between dependent types by normalising type-level programs 
+    \item Research is ongoing into whether dependent type theories such as Coq can use NbE to check for equality between dependent types by normalising type-level programs \cite{deBruijn}
 \end{enumerate}
 
 % --roadmap
-To become familiar with the general operation of NbE, in Chapter \ref{chap:untypednbe} we present two implementations for NbE of the untyped lambda calculus. The first implementation normalises the named lambda calculus. This implementation works but its correctness depends on fresh name generation which makes it difficult to reason about. This issue motivates a second implementation of NbE, where we normalise a nameless representation of the lambda terms instead. Since variable names are not part of this syntax, fresh variables but much easier to generate.
+To become familiar with the general operation of NbE, in Chapter \ref{chap:untypednbe} we present two implementations for NbE of the untyped lambda calculus. The first implementation normalises the named lambda calculus. This implementation works, but its correctness depends on fresh name generation which makes it difficult to reason about. This issue motivates a second implementation of NbE, where we normalise a nameless representation of the lambda terms instead. Since variable names are not part of this syntax, fresh variables are much easier to generate.
 
-Then we move to the central challenge of this project: translating an Agda implementation of NbE for the Simply Typed Lambda Calculus (STLC) into Haskell. The Agda implementation we follow makes use of advanced type-level features such as dependent types and dependent pattern matching. However, Agda is currently unsuitable for industrial use for the following reasons
+Then we move to the central challenge of this project: translating an Agda implementation of NbE for the Simply Typed Lambda Calculus (STLC) into Haskell. The Agda implementation we follow makes use of advanced type-level features such as dependent types and dependent pattern matching. However, Agda is currently unsuitable for general-purpose programming for the following reasons
 
 \begin{enumerate}
-    \item It is a type theory and proof assistant primarily, rather than a general purpose programming language
+    \item It is a type theory and proof assistant primarily, rather than a general-purpose programming language
     \item It has a steep learning curve due to the theoretical understanding required to develop programs
-    \item Compilation is slow [CITE]
     \item The community supporting it is small and mainly academic
 \end{enumerate}
 
-Haskell is a mature language suitable for industry use [CITE HASKELL INDUSTRY USAGE] as it strikes a balance between theory and practice, allowing developers to take advantage of type-safety without as much theoretical overhead. However, recent compiler options have enabled the use of advanced type-features more akin to dependently typed languages. 
+Haskell is a mature language suitable for industry use [CITE HASKELL INDUSTRY USAGE] as it strikes a balance between theory and practice, allowing developers to take advantage of type-safety without as much theoretical overhead. However, recent compiler options have enabled the use of advanced type-features more akin to dependently typed languages such as Agda. 
 
-Through implementing NbE for the STLC, this project will assess whether Haskell can be used to emulate features of languages with full dependent types. Members of the Haskell community are actively working on bringing full dependent types to Haskell \cite{DH}, but this project serves as an evaluation of how well the existing tooling for complex types work in practice.
+Through implementing NbE for the STLC, this project will assess whether Haskell can be used to emulate features of languages with full dependent types. Members of the Haskell community are actively working on bringing full dependent types to Haskell \cite{DH}, but this project serves as an evaluation of how well the existing tooling for complex types works in practice.
 
 In Chapter \ref{chap:typedlamadacalculus}, we use introduce and use Generalised Algebraic Datatypes (GADTs) in conjunction with the \code{DataKinds} and \code{PolyKinds} extensions to define terms that are well-typed by construction. 
-
-In Chapter \ref{chap:typednbe} we implement the well-typed normalisation function. For this we need the \code{RankNTypes} extension, which gives finer control over quantification in polymorphic type signatures, and \code{ScopedTypeVariables}, to bind type variables within function bodies. To emulate reflection of dependent types from the type level to the value level at runtime we explore the singleton pattern.
+In Chapter \ref{chap:typednbe} we implement the well-typed normalisation function. For this we need the \code{RankNTypes} extension, which gives finer control over quantification in polymorphic type signatures, and \code{ScopedTypeVariables}, to bind type variables within function bodies. To emulate reflection of dependent types from the type level to the value level at runtime, we explore a method inspired by the singleton pattern \cite{singletons}.
 
 The aims of this project are:
 \begin{enumerate}

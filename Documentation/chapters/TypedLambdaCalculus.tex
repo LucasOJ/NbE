@@ -19,7 +19,7 @@ In this type syntax there is a single base type \code{BaseTy} and an infix type 
 %TODO: Justify why, type checking?
 Normalising terms with polymorphic types is beyond the scope of this project.
  
-\code{infixr :-> 9} specifies that \code{:->} is right associative, so as per convention, the type \code{A :-> (B :-> C)} can instead be written \code{A :-> B :-> C}.
+\code{infixr 9 :->} specifies that \code{:->} is right associative, so as per convention, the type \code{A :-> (B :-> C)} can instead be written \code{A :-> B :-> C}.
 
 \section{First Attempt at Typed Terms}
 
@@ -35,11 +35,11 @@ This implementation uses the de Bruijn style explored in Chapter \ref{chap:untyp
 
 % TODO: Explain typing context with de Bruijn indicies here
 
-However, with this implementation it is possible to construct terms which are not well-typed such as \code{Var BaseTy [] 0}. This is because the set of representable terms is exactly the set of untyped terms, many of which are not well-typed. We could have a separate type-checking function to verify whether terms are well-typed before normalisation, but there would be no guarantee that the normalisation function produces well-typed terms.
+However, with this implementation it is possible to construct terms which are not well-typed such as \code{Var BaseTy [] 0} (no variable is well-typed if the typing context is empty). This is because the set of representable terms is exactly the set of untyped terms, many of which are not well-typed. We could have a separate type-checking function to verify whether terms are well-typed before normalisation, but there would be no guarantee that the normalisation function produces well-typed terms.
 
-Instead, we opt for an approach where the only inhabitants of \code{Expr} are well-typed terms. This guarantees that terms are well-typed before and after normalisation, and removes the additional complexity of a type-checker. To implement a datatype of terms that are well-typed by construction, we need to do more than simply add the type and typing context of each term. We also need to restrict the construction of terms based on the typing judgement rules of the STLC. In Section \ref{sect:typedsyntax}, we present a method for specifying these type restrictions developed by Richard Eisenberg \cite{GADTs}, using GADTs.
+Instead, we opt for an approach where the only inhabitants of \code{Expr} are well-typed terms. This guarantees that terms are well-typed before and after normalisation, and removes the additional complexity of a type-checker. To implement a datatype of terms that are well-typed by construction, we need to do more than simply add the type and typing context of each term. We also need to restrict the construction of terms based on the typing judgement rules of the STLC. In Section \ref{sect:typedsyntax}, we present a method for specifying these type restrictions developed by Richard Eisenberg \cite{GADTs}, using Generalised Algebraic Datatypes (GADTs).
 
-\section{Introduction to Generalised Algebraic Datatypes (GADTs)}
+\section{Introduction to Generalised Algebraic Datatypes}
 
 GADTs are a generalisation of algebraic datatypes, where the type signature of each constructor is explicitly specified. The canonical example of a GADT is the length-indexed vector, where the length of each vector is tracked in its type.
 
@@ -68,14 +68,14 @@ We use the \code{DataKinds} compiler extension to automatically create a kind \c
 
 %TODO: Motivation for GADT, well typed by contruction, typesafe (pre-condition), problem-> Solution, ADT Implementation and drawbacks
 
-We use the \code{'Zero} and \code{'Succ} type constructors to represent numbers at the type level. Using the \code{GADTs} extension we now define the datatype for length-indexed vectors using GADT syntax.
+We use the \code{'Zero} and \code{'Succ} type constructors to represent numbers at the type level. Using the \code{GADTs} extension we now define the datatype for length-indexed vectors using GADT syntax \cite{GADTs}.
 
 \begin{lstlisting}
     data Vec :: * -> Nat -> * where
         ZeroVec :: Vec a 'Zero
         SuccVec :: a -> Vec a n -> Vec a ('Succ n)
 \end{lstlisting}
-\cite{GADTs}
+
 
 A value of type \code{Vec a n} is a vector of \code{n} elements of type \code{a}. For this definition we also require the \code{KindSignatures} compiler extension to specify the kind signature of \code{Vec} in the first line of the definition. This specifies that the first type parameter of \code{Vec}, denoting the type of the elements of the vector, should be of kind \code{*}. This is because the type of the elements of the vector could be any concrete type, all of which are inhabitants of \code{*}. The first line also specifies that the second type parameter of \code{Vec}, denoting the length of the vector, should be a type inhabiting the promoted kind \code{Nat}, which we use to represent a type-level number. The returned kind \code{*} in the kind signature specifies that each vector has a concrete type of kind \code{*}.
 % TODO: Define "concrete type"
@@ -108,7 +108,7 @@ The \code{Head} constructor produces a proof that \code{x} is an element of any 
 
 Note that all elements of said lists are at the type level, so we need a promoted type-level version of the \code{(:)} list constructor. Promotion to the type-level constructor \code{'(:)} is handled by \code{DataKinds}, however we need to enable the \code{TypeOperators} extension to allow the use of the infix operators at type-level. Without the \code{TypeOperators} extension we could use the syntax \code{Elem ('(:) x xs)} in the definition of \code{Head}, however this is harder to read.
 
-\code{[a]} is the kind consisting of lists with type-level elements of the same kind \code{a}, rather than the standard list of value-level elements of the same type. To write this polymorphic kind signature we need the \code{PolyKinds} extension, which extends the \code{KindSignatures} extension by enabling polymorphic kind signatures. Since \code{KindSignatures} is a dependency of \code{PolyKinds} it is implicitly enabled when using \code{PolyKinds}, so we can replace the \code{KindSignatures} extension declaration with \code{PolyKinds}.
+\code{[a]} is the kind consisting of lists with type-level elements of the same kind \code{a}, rather than the standard list of value-level elements of the same type. To write this polymorphic kind signature we need the \code{PolyKinds} extension, which extends the \code{KindSignatures} extension. Since \code{KindSignatures} is a dependency of \code{PolyKinds} it is implicitly enabled when using \code{PolyKinds}, so we can replace the \code{KindSignatures} extension declaration with \code{PolyKinds}.
 
 % TODO: Curry-Howard Isomorphism
 
@@ -134,12 +134,17 @@ The \code{Var} constructor corresponds to the variable typing judgement rule. In
 A variable can only be a well-typed expression of type \code{ty} if \code{ty} is present in the typing context. The argument of type \code{Elem ctx ty} proves that \code{ty} is in the typing context \code{ctx}. Thus, it is impossible to construct a variable which is not well-typed.
 
 % TODO: purpose 2 - refer to variables
-From inspecting the constructors of \code{Elem}, we notice that all \code{Elem} values take the form of \code{Tail ( $\dots$ (Tail Head) $\dots$ )}. 
+From inspecting the constructors of \code{Elem}, we notice that all \code{Elem} values take the form 
+
+\begin{lstlisting}
+    Tail ( $\dots$ (Tail Head) $\dots$ ) 
+\end{lstlisting}
+
 The \code{Elem} value with $n$ tail constructors refers to $n$th most recently bound variable in the typing context, and hence to the variable with de Bruijn index $n$. For example \code{Var (Tail Head)} could have type \code{Expr '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}, where \code{Tail Head} has the type \code{Elem '[BaseTy, BaseTy :-> BaseTy, BaseTy] ('BaseTy :-> 'BaseTy)}. Here \code{Tail Head} refers to the bound variable with de Bruijn index 1 (since it has one \code{Tail} constructor), which we see from the context has type \code{BaseTy :-> BaseTy}.
 
 % TODO: Reword above
 
-The \code{Lam} constructor corresponds to the abstraction typing judgement rule. Given a well-typed expression of type \code{result} in the context \code{arg:ctx}, we can abstract out the first variable of context into a bound variable with a lambda expression, producing a new term with the function type \code{arg :-> result} in the weakened context. We refer to the argument of the \code{Lam} constructor as the body of the lambda.
+The \code{Lam} constructor corresponds to the abstraction typing judgement rule. Given a well-typed expression of type \code{result} in the context \code{arg:ctx}, we can abstract out the first variable of context into a bound variable with a lambda expression, producing a new term with the function type \code{arg :-> result} in the weakened context \code{ctx}. We refer to the argument of the \code{Lam} constructor as the body of the lambda.
 
 The \code{App} constructor corresponds directly to the application typing judgement rule, where we can apply one term to another if they share the same context \code{ctx} and the type of the second term matches the argument type \code{arg} of the first term.
 

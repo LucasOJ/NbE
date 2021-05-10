@@ -30,24 +30,22 @@
 % Summary of what we did 
 %   3 variations
 %   possible to translate Agda implementation to Haskell with type guarentees
+
 \section{Summary}
-In this dissertation we produced three variations of NbE. The first normalised named, untyped lambda calculus using the Gensym approach, following an implementation by Lindley \cite{slides}. Issues with fresh variable names inspired a second implementation for untyped de Bruijn terms which we adapted from a specification by Abel \cite{deBruijn}. GADTs were used to define the STLC in Haskell, before successfully translating an implementation of NbE for the SLTC by Kovacs \cite{AgdaNbe} from Agda to Haskell. We found that GHC compiler extensions are powerful enough to emulate some features of dependently typed languages.
+In this dissertation we produced three variations of NbE. The first normalised the untyped lambda calculus using the Gensym approach, following an implementation by Lindley \cite{slides}. Issues with fresh variable names inspired a second implementation for untyped de Bruijn terms which we adapted from a specification by Abel \cite{deBruijn}. GADTs were used to define the STLC in Haskell, before successfully translating an implementation of NbE for the SLTC by Kovacs \cite{AgdaNbe} from Agda to Haskell. In the evaluation, we verified that that our implementations are correct, and found that GHC compiler extensions are powerful enough to emulate some features of dependently typed languages, albeit with practical drawbacks to their use.
 
 \section{Evaluation of Aims}
 
+We met both of our original aims, although there are areas for further study in both.
+
+Our first aim was to produce various implementations of NbE in Haskell, which we achieved in Chapters \ref{chap:untypednbe} and \ref{chap:typednbe} and verified in Section \ref{section:testing}. This aim was intentionally left very open, since this was an exploratory project where it was difficult to predict the problems that would arise, and the amount of time each implementation would take. Each implementation served a valuable purpose. The Gensym implementation helped us understand the operation of NbE. The de Bruijn implementation was useful in deepening this understanding, which we evidenced by adding our own variations on the guiding implementation. The typed implementation allowed us to test advanced typing features, and presented challenges when Haskell fell short of Agda's features.
+
+Our second aims was to explore how successful modern features of Haskell are in implementing an algorithm with complex types, which we discussed in Chapter \ref{chap:evaluation}. We saw that all the advanced features worked well at achieveing their specific goals, and made it possible to construct programs that would not be possible in standard Haskell. However, the recurring conclusion was that these features incur a significant amount of additional work in practice, and can lead to difficult problems. Thus, their use is hard to justify unless the type-security of the program is the priority. The release of Dependent Haskell \cite{DH} should address some of these issues by making dependent features a more central part of the language.
+
 \section{Areas for Further Study}
 
-% Evaluation of Haskell language features in terms of typed NbE implementation
-%    Singletons worked well, complex applications could struggle
-%    Singleton library for automation
-%    GADTs with DataKinds "good", type renfinement, moves errors to compile time.
-%   Proofs as programs
-%    type annotations, inference not as strong as type theories
-%    Untyped vs typed speed
+As part of our second aim, we would have liked to benchmark NbE for the STLC against the untyped implementations to evaluate the performance trade-off of the additional type information. As mentioned in Section \ref{subsect:GADTanalysis}, we were unable to construct the necessary class instances to benchmark our normalisation, however this is an interesting problem that others are already researching \cite{gadtClassInstances}. If solved, it would also be interesting to benchmark the Haskell implementation of typed NbE against Kovac's Agda implementation, as a significant difference in performance could be compelling reason to choose one over the other in practice.
 
-One practical reason developers may opt to implement programs in Haskell rather than dependently typed languages is performance. It would be interesting to benchmark the produced SLTC NbE implementation against its Agda counterpart, as a significant difference in performance could be compelling reason to choose one over the other in practice. 
+In Section \ref{subsect:rankNTypes}, we suggested an investigation into whether the \code{RankNTypes} extension leads to overly general type inference.
 
-Another avenue for future work is to translate Kovacs' full proof of correctness from Agda to Haskell???
-
-% future work
-    % Correctness proofs from \cite{AgdaNbe} translate over
+In Section \ref{sect:typedNormalisation}, we identified the additional challenge of translating Kovacs' full proof of correctness for the typed NbE implementation from Agda to Haskell. If possible, we would have extremely strong evidence that the Haskell \code{normalise} implementation produces the correct normal form. 

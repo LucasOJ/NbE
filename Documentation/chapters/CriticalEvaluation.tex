@@ -32,7 +32,7 @@ In all our implementations, the type system ensures that \code{normalise} return
 
 We discuss the testing of the STLC NbE implementation, but testing for the de Bruijn and Gensym NbE implementations can be easily derived by removing the types and changing the term syntax of our tests. Testing for all three implementations is included in the full source code. 
 
-To test \code{normalise}, we want to generate large, well-typed expressions with many redexes to contract. We choose the Church numerals and operations on them as it is easy to construct large terms with predictable normal forms. The Church numerals are a representation of the non-negative integers in the lambda calculus of the form $\lambda f x . f (f \dots (f x) \dots)$, where the numeral $n$ is encoded by $n$ applications of $f$ \cite{churchEncodings}.  
+To test \code{normalise}, we want to generate large, well-typed expressions with many redexes to contract. We choose the Church numerals and operations on them as it is easy to construct large terms with predictable normal forms. The Church numerals are a representation of the natural numbers in the lambda calculus of the form $\lambda f x . f (f \dots (f x) \dots)$, where the numeral $n$ is encoded by $n$ applications of $f$ \cite{churchEncodings}.  
 
 \begin{lstlisting}
     type ChurchNumeralTy = ((BaseTy :-> BaseTy) :-> BaseTy :-> BaseTy)
@@ -40,7 +40,7 @@ To test \code{normalise}, we want to generate large, well-typed expressions with
     type ChurchNumeral = Expr '[] ChurchNumeralTy
 \end{lstlisting}
 
-We define the type \code{ChurchNumeralTy} as the concrete type of Church numerals in the \code{Expr} syntax, where \code{BaseTy :-> BaseTy} is the type of the function $f$, and \code{BaseTy} is the type of its argument \code{x}. Instead of \code{BaseTy}, we could have used any type as the encoding only depends on the strucuture of the term. However, in our implementation to satisfy \code{SingTy} constraints we must choose a concrete type rather than a type variable. It makes sense to use the simplest type possible to avoid additional complexity. We also have to choose a concrete context to satisfy the \code{SingContext} constraints. Since Church numerals contain no free variables, we specify that our encoding of the Church numerals have an empty initial context in the definition of the type alias \code{ChurchNumeral}. 
+We define the type \code{ChurchNumeralTy} as the concrete type of Church numerals in the \code{Expr} syntax, where \code{BaseTy :-> BaseTy} is the type of the function $f$, and \code{BaseTy} is the type of its argument \code{x}. Instead of \code{BaseTy}, we could have used any type as the encoding only depends on the structure of the term. However, in our implementation to satisfy \code{SingTy} constraints we must choose a concrete type rather than a type variable. It makes sense to use the simplest type possible to avoid additional complexity. We also have to choose a concrete context to satisfy the \code{SingContext} constraints. Since Church numerals contain no free variables, we specify that our encoding has an empty initial context in the definition of the type synonym \code{ChurchNumeral}. 
 
 \begin{lstlisting}
     app2 :: Expr ctx (a :-> b :-> c) -> Expr ctx a -> Expr ctx b -> Expr ctx c
@@ -50,7 +50,6 @@ We define the type \code{ChurchNumeralTy} as the concrete type of Church numeral
     toChurchNumeral 0 = Lam (Lam (Var Head))
     toChurchNumeral i = App churchSucc (toChurchNumeral (i - 1)) 
         where
-
             churchSucc :: Expr '[] (ChurchNumeralTy :-> ChurchNumeralTy)
             churchSucc = Lam (Lam (Lam (App f (app2 n f x))))
 
@@ -75,12 +74,12 @@ where we have replaced \code{Elem} variables with de Bruijn indices for brevity.
     Lam (Lam (App (Var 1) (App (Var 1) (Var 0))))
 \end{lstlisting}
 
-which we recognise as the Church numeral for 2, $\lambda f x . f (f x)$. This is encouraging evidence that \code{normalise} is working correctly for larger terms. Since we can generate Church numerals, we define operations on them to build more complex terms.
+which we recognise as the Church numeral for 2, $\lambda f x . f (f x)$. This is encouraging evidence that \code{normalise} is correct. Since we can generate Church numerals, we define operations on them to build more complex terms.
 
 \begin{lstlisting}
     addChurchNumeral :: ChurchNumeral -> ChurchNumeral -> ChurchNumeral
     addChurchNumeral = app2 churchAdd
-        where 
+        where
             churchAdd :: ClosedExpr (ChurchNumeralTy :-> ChurchNumeralTy :-> ChurchNumeralTy)
             churchAdd = Lam (Lam (Lam (Lam (app2 m f (app2 n f x)))))
 
@@ -98,9 +97,9 @@ The \code{addChurchNumeral} function applies the syntactic Church addition combi
                 == normaliseDB (toChurchNumeral (m + n))
 \end{lstlisting}
 
-\code{prop_add} represents the desired property that for any two non-negative integers \code{n} and \code{m}, adding their Church numerals and normalising the result yields the same expression as adding the integers and normalising the Church numeral. This function returns \code{True} for all non-negative values of \code{n} and \code{m} provided, which is strong evidence that \code{normalise} is producing the correct normal form. Notice that we use \code{normaliseDB} in our property, which first normalises the expression as usual using \code{normalise}, but then converts it into a de Bruijn expression. We do this because \code{Expr} is not part of the \code{Eq} class, for reasons we explore in Section \ref{subsect:GADTanalysis}
+\code{prop_add} represents the desired property that for any two natural numbers \code{n} and \code{m}, adding their Church numerals and normalising the result yields the same expression as adding the integers and normalising the Church numeral. This function returns \code{True} for all non-negative values of \code{n} and \code{m} we've checked, which is strong evidence that \code{normalise} is producing the correct normal form. To automate the checking of this property we could use the \code{QuickCheck} package. Notice that we use \code{normaliseDB} in \code{prop_add}, which first normalises the expression as usual using \code{normalise}, but then converts it into a de Bruijn expression. We do this because \code{Expr} is not part of the \code{Eq} class, for reasons we explore in Section \ref{subsect:GADTanalysis}
 
-We developed a similar property for Church multiplication. Additionally, we verified that \code{normalise} could evaluate expressions constructed using the Church boolean encoding.
+We developed a similar property for Church multiplication. Additionally, we verified that \code{normalise} can evaluate expressions constructed using the Church boolean encoding.
 
 \section{Evaluation of Language Features}
 
@@ -109,7 +108,9 @@ In this section we evaluate how well Haskell's advanced language features worked
 \subsection{GADTs}
 \label{subsect:GADTanalysis}
 
-We found that \code{GADTs} is an excellent extension for emulating dependent types when combined with \code{PolyKinds}. GADT syntax allowed us to define types \code{Expr} with much greater precision and enabled us to translate Agda \code{data} definitions such as \code{OPE} and type generating functions such as $\text{Ty}^\text{N}$, that otherwise could not be expressed in Haskell.
+We found that \code{GADTs} is an excellent extension for emulating dependent types when combined with \code{PolyKinds}. GADT syntax allowed us to define types such as \code{Expr} that would not be possible in standard Haskell. It also enabled us to translate Agda \code{data} definitions such as \code{OPE} and type generating functions such as $\text{Ty}^\text{N}$, that otherwise could not be expressed in Haskell. 
+
+The NbE algorithm highlighted the mathematical rigour that GADTs allow us to encode in Haskell, such as proving the weakening property of the STLC using \code{strengthenNormal}, the transitivity of \code{OPE}s using \code{composeOPEs}, and the subject reduction property of \code{normalise}. We can be confident in the correctness of our implementation thanks to the programs as proofs perspective GADTs has awarded us. In cases where definitions were not correct, the types were not satisfied, providing a stronger layer of security against errors than standard Haskell. For example, modifying any of the cases in \code{strengthenElem} creates a type error.
 
 However, during the analysis and testing of our implementation, we found that GADTs indexed by types can create difficulties for deriving useful class instances. For example, it would be desirable for \code{NormalForm} to be a member of the \code{Eq} class, so that during testing we could directly check if two normal forms are equal (see Section \ref{section:testing}). 
 
@@ -126,7 +127,7 @@ Here we have attempted to implement an \code{Eq} instance for \code{NeutralForm}
 
 We attempted to benchmark the typed NbE implementation, to evaluate how much performance overhead the additional type information incurred compared to the untyped implementations. However, to use Haskell's benchmarking features, we need a \code{NormalForm} instance for the \code{NFData} class. As \code{NormalForm} is a GADT, GHC is unable to automatically derive the instance. This further exemplifies how the class limitation makes GADTs more difficult to work with, and it would be interesting to explore whether this limitation could be overcome.
 
-In general, we believe that GADTs are a useful tool for Haskell developers to improve the type-safety of their programs by taking advantage of the programs as proof paradigm. However, the instance deriving limitation shows that the extension is not completely mature yet. 
+In general, we believe that GADTs are a useful tool for Haskell developers to improve the type-safety of their programs by taking advantage of the programs as proof paradigm. However, the instance deriving limitation shows that the extension is not completely mature yet, and in cases where type-safety is not paramount, the additional effort GADTs require may outweigh the reward. 
 
 \subsection{Dependent Pattern Matching}
 
@@ -136,11 +137,12 @@ However, in some situations we were forced to add type constraints to data types
 
 Our boilerplate overhead was small, since we only needed dependent pattern matches for a few functions. However, as noted in Section \ref{sect:typedNormalisation} for more complex applications with many dependent pattern matches, this boilerplate could become more difficult to manage. The boilerplate was also compact since our implementation only required pattern matches on the structure of types. For example, \code{idOpe} only depended on the length of the type-level context, so there was no need to identify its contents. This meant we only used a portion of the singleton pattern, which can be used to extract all the type-level information into the value level, at the cost of additional boilerplate.
 
-Richard Eisenberg's proposals for built-in dependent pattern matches using a syntax to Agda would be a much cleaner approach than \code{GADTs}, but the current solution for managing dependent pattern matches is the \code{singleton} library. This library uses template Haskell to automatically generate the instances and data types needed for “faking” dependent pattern matches, and would be useful for dependent pattern matching at scale.
+Richard Eisenberg's proposals for built-in dependent pattern matches using a syntax to similar Agda would be a much cleaner approach than \code{GADTs}, but the current solution for managing dependent pattern matches is the \code{singleton} library \cite{singletonLibrary}. This library uses template Haskell to automatically generate the instances and data types needed for “faking” dependent pattern matches, and would be useful for dependent pattern matching at scale.
 
 \subsection{Arbitrary-Rank Polymorphism}
+\label{subsect:rankNTypes}
 
 When defining the \code{Function} constructor of the STLC semantic set, we used explicit \code{forall} syntax to implement nested polymorphism. Whilst this satisfied most type requirements, when constructing concrete \code{Function} elements, GHC could not infer necessary type variable equalities to complete type-checking. We resolved this issue by using type annotations to bind type variables in function arguments. 
 
-An interesting area for further study could be to identify why type inference was not able to derive the type variable equalities in these cases. We suspect that it could be due to the higher ranked polymorphism, as \code{Function} was the only definition in our implementation that made use of the \code{RankNTypes} extension.
-
+An interesting area for further study could be to identify why type inference was not able to derive the type variable equalities in these cases. We suspect that it could be due to the higher ranked polymorphism, as \code{Function} was the only definition in our implementation that made use of the \code{RankNTypes} extension. If this is the case, then the \code{RankNTypes} extension can reduce type-safety by introducing \code{Any} types, which can be satisfied with incorrect implementations.
+% TODO: Bring together thoughts
