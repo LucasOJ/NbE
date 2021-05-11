@@ -119,16 +119,12 @@
 % for each project, but an example might be as follows:
 
 
-My research hypothesis is that Haskell extensions are powerful enough to implement Normalisation by Evaluation for the Simply Typed Lambda Calculus. 
-
-\vspace{\baselineskip}
+Haskell is an industrial strength functional programming language. In this project we investigate if modern compiler extensions can be used to emulate features of languages with full dependent types. We also assess how practical these extensions are. We do this by implementing variations of Normalisation by Evaluation, an algorithm with complex types.
 
 \noindent
-The aims of this project are
-\begin{enumerate}
-    \item To produce various implementations of Normalisation by Evaluation in Haskell
-    \item To explore how successful modern features of Haskell are in implementing an algorithm with complex types.
-\end{enumerate}
+\begin{quote}
+      My research hypothesis is that Haskell extensions are powerful enough to implement Normalisation by Evaluation for the Simply Typed Lambda Calculus. 
+\end{quote}
 
 \noindent
 In this project we
@@ -136,7 +132,7 @@ In this project we
 \begin{itemize}
 \item Implement two variations of Normalisation by Evaluation for the untyped lambda calculus in  Haskell, see Chapter \ref{chap:untypednbe}, following mathematical specifications.
 \item Translate an Agda implementation of Normalisation by Evaluation into Haskell using compiler extensions, see Chapter \ref{chap:typednbe}, which demonstrates that the research hypothesis was correct.
-\item Evaluate the practical use of the features enabled by compiler extensions, and recommend their use in instances where type-safety is the primary priority, see Chapter \ref{chap:evaluation}.
+\item Evaluate the practical use of the features enabled by compiler extensions, and recommend their use in instances where type-safety is the primary goal, see Chapter \ref{chap:evaluation}.
 \end{itemize}
 
 
