@@ -42,7 +42,7 @@ To test \code{normalise}, we want to generate large, well-typed expressions with
 
 We define the type \code{ChurchNumeralTy} as the concrete type of Church numerals in the \code{Expr} syntax, where \code{BaseTy :-> BaseTy} is the type of the function $f$, and \code{BaseTy} is the type of its argument \code{x}. Instead of \code{BaseTy}, we could have used any type as the encoding only depends on the structure of the term. However, in our implementation to satisfy \code{SingTy} constraints we must choose a concrete type rather than a type variable. It makes sense to use the simplest type possible to avoid additional complexity. We also have to choose a concrete context to satisfy the \code{SingContext} constraints. Since Church numerals contain no free variables, we specify that our encoding has an empty initial context in the definition of the type synonym \code{ChurchNumeral}. 
 
-\begin{lstlisting}
+\begin{lstlisting}[morekeywords={a, b, c}]
     app2 :: Expr ctx (a :-> b :-> c) -> Expr ctx a -> Expr ctx b -> Expr ctx c
     app2 f x y = App (App f x) y 
 

@@ -70,22 +70,23 @@ We use the \code{DataKinds} compiler extension to automatically create a kind \c
 
 We use the \code{'Zero} and \code{'Succ} type constructors to represent numbers at the type level. Using the \code{GADTs} extension we now define the datatype for length-indexed vectors using GADT syntax \cite{GADTs}.
 
-\begin{lstlisting}
+\begin{lstlisting}[morekeywords={a, n}]
     data Vec :: * -> Nat -> * where
         ZeroVec :: Vec a 'Zero
         SuccVec :: a -> Vec a n -> Vec a ('Succ n)
 \end{lstlisting}
 
+\newcommand{\veccode}{\lstinline[morekeywords={a, n}]}
 
-A value of type \code{Vec a n} is a vector of \code{n} elements of type \code{a}. For this definition we also require the \code{KindSignatures} compiler extension to specify the kind signature of \code{Vec} in the first line of the definition. This specifies that the first type parameter of \code{Vec}, denoting the type of the elements of the vector, should be of kind \code{*}. This is because the type of the elements of the vector could be any concrete type, all of which are inhabitants of \code{*}. The first line also specifies that the second type parameter of \code{Vec}, denoting the length of the vector, should be a type inhabiting the promoted kind \code{Nat}, which we use to represent a type-level number. The returned kind \code{*} in the kind signature specifies that each vector has a concrete type of kind \code{*}.
+A value of type \veccode{Vec a n} is a vector of \veccode{n} elements of type \veccode{a}. For this definition we also require the \code{KindSignatures} compiler extension to specify the kind signature of \code{Vec} in the first line of the definition. This specifies that the first type parameter of \code{Vec}, denoting the type of the elements of the vector, should be of kind \code{*}. This is because the type of the elements of the vector could be any concrete type, all of which are inhabitants of \code{*}. The first line also specifies that the second type parameter of \code{Vec}, denoting the length of the vector, should be a type inhabiting the promoted kind \code{Nat}, which we use to represent a type-level number. The returned kind \code{*} in the kind signature specifies that each vector has a concrete type of kind \code{*}.
 % TODO: Define "concrete type"
 
-Since \code{Vec} is a GADT, the types of each constructor are given explicitly. The \code{ZeroVec} constructor creates a vector with elements of any type (since \code{a} is universally quantified over) of length \code{'Zero}. The \code{SuccVec} constructor takes a value of type \code{a} and a vector of \code{n} elements of type \code{a}, and returns a new vector of length \code{'Succ n}. For example, the vector \code{SuccVec "a" (SuccVec "b" ZeroVec)} has type \code{Vec String ('Succ ('Succ 'Zero))}.
+Since \code{Vec} is a GADT, the types of each constructor are given explicitly. The \code{ZeroVec} constructor creates a vector with elements of any type (since \code{a} is universally quantified over) of length \code{'Zero}. The \code{SuccVec} constructor takes a value of type \veccode{a} and a vector of \veccode{n} elements of type \veccode{a}, and returns a new vector of length \veccode{'Succ n}. For example, the vector \code{SuccVec "a" (SuccVec "b" ZeroVec)} has type \code{Vec String ('Succ ('Succ 'Zero))}.
 
 An immediate advantage of using GADT length-indexed vectors over standard lists is that we can define a new function \code{head'} which only operates on vectors containing at least one element. 
 
-\begin{lstlisting}
-    head' :: Vec a (Succ n) -> a
+\begin{lstlisting}[morekeywords={a, n}]
+    head' :: Vec a ('Succ n) -> a
     head' (SuccVec x xs) = x
 \end{lstlisting}
 
@@ -95,20 +96,22 @@ The additional type precision awarded by GADTs moves errors from run-time to com
 
 \section{Elem GADT}
 
-Before using GADTs to construct the set of well-typed expressions, we first define the \code{Elem} GADT. A value of type \code{Elem xs x} is a proof that the type \code{x} is an element of the list of types \code{xs}. 
+\newcommand{\elemcode}{\lstinline[morekeywords={a, [a], x, xs, y}]}
 
-\begin{lstlisting}
+Before using GADTs to construct the set of well-typed expressions, we first define the \code{Elem} GADT. A value of type \elemcode{Elem xs x} is a proof that the type \elemcode{x} is an element of the list of types \elemcode{xs}. 
+
+\begin{lstlisting}[morekeywords={a, [a], x, xs, y}]
     data Elem :: [a] -> a -> * where
         Head :: Elem (x ': xs) x
         Tail :: Elem xs x -> Elem (y ': xs) x
 \end{lstlisting}
 \cite{GADTs}
 
-The \code{Head} constructor produces a proof that \code{x} is an element of any list beginning with \code{x}. Given a value of type \code{Elem xs x}, the \code{Tail} constructor produces a proof that \code{x} is an element of the extended list \code{y:xs} for any element \code{y}. For example, the value \code{Tail Head} could have type \code{Elem '["a","b","c","d"] "b"} or type \code{Elem '[4, 5] 5}. 
+The \elemcode{Head} constructor produces a proof that \elemcode{x} is an element of any list beginning with \elemcode{x}. Given a value of type \elemcode{Elem xs x}, the \elemcode{Tail} constructor produces a proof that \elemcode{x} is an element of the extended list \elemcode{y:xs} for any element \elemcode{y}. For example, the value \elemcode{Tail Head} could have type \code{Elem '["a","b","c","d"] "b"} or type \elemcode{Elem '[4, 5] 5}. 
 
-Note that all elements of said lists are at the type level, so we need a promoted type-level version of the \code{(:)} list constructor. Promotion to the type-level constructor \code{'(:)} is handled by \code{DataKinds}, however we need to enable the \code{TypeOperators} extension to allow the use of the infix operators at type-level. Without the \code{TypeOperators} extension we could use the syntax \code{Elem ('(:) x xs)} in the definition of \code{Head}, however this is harder to read.
+Note that all elements of said lists are at the type level, so we need a promoted type-level version of the \elemcode{(:)} list constructor. Promotion to the type-level constructor \elemcode{':} is handled by \elemcode{DataKinds}, however we need to enable the \elemcode{TypeOperators} extension to allow the use of the infix operators at type-level. Without the \elemcode{TypeOperators} extension we could use the syntax \elemcode{Elem ('(:) x xs)} in the definition of \elemcode{Head}, however this is harder to read.
 
-\code{[a]} is the kind consisting of lists with type-level elements of the same kind \code{a}, rather than the standard list of value-level elements of the same type. To write this polymorphic kind signature we need the \code{PolyKinds} extension, which extends the \code{KindSignatures} extension. Since \code{KindSignatures} is a dependency of \code{PolyKinds} it is implicitly enabled when using \code{PolyKinds}, so we can replace the \code{KindSignatures} extension declaration with \code{PolyKinds}.
+\elemcode{[a]} is the kind consisting of lists with type-level elements of the same kind \elemcode{a}, rather than the standard list of value-level elements of the same type. To write this polymorphic kind signature we need the \elemcode{PolyKinds} extension, which extends the \elemcode{KindSignatures} extension. Since \elemcode{KindSignatures} is a dependency of \elemcode{PolyKinds} it is implicitly enabled when using \elemcode{PolyKinds}, so we can replace the \elemcode{KindSignatures} extension declaration with \elemcode{PolyKinds}.
 
 % TODO: Curry-Howard Isomorphism
 
@@ -152,7 +155,7 @@ Using this implementation for \code{Expr}, it is guaranteed that an expression o
 
 % TODO: Input/Ouput type as pre-condition/post-condition (eg empty context), programs as proof
 
-Note that the apostrophes on type-level constructors are not required for successful compilation, as GHC can infer whether the constructor is type-level or value-level automatically. 
+Note that the apostrophes on type-level constructors are not required for successful compilation, as GHC can infer whether the constructor is type-level or value-level automatically. From this point we omit the apostrophe unless it ambiguous whether a constructor operates at the value-level or type-level.
 % TODO: Useful for getting started, now bulky, omit for remainer of dissertation
 
 

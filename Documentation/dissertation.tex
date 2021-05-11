@@ -42,22 +42,23 @@
 \lstset{
   basicstyle=\ttfamily\small,
   keywordstyle=[0]\bfseries\color{bittersweet},
-  keywordstyle=[1]\bfseries\color{teal},
-  keywordstyle=[3]\bfseries\color{dark},
+  keywordstyle=[3]\bfseries\color{teal},
+  keywordstyle=[1]\bfseries\color{dark},
   keywordstyle=[2]\bfseries,
   columns=spaceflexible,
   morekeywords=[0]{data, where, type, class, instance, case, of, do, return, infixr},
-  morekeywords=[1]{Name, String, Expr, NormalForm, NeutralForm, Env, Map, V, NeutralV, FreshName, State, Set, DbExpr, Int, Ty, Nat, Vec, Elem, OPE, NeutralExpr, NormalExpr, forall, SingTy, STy, Any, SingContext, 'BaseTy, Eq, ChurchNumeralTy, ChurchNumeral, NFData, [Name], [Ty]},
+  morekeywords=[3]{Name, String, Expr, NormalForm, NeutralForm, Env, Map, V, NeutralV, FreshName, State, Set, DbExpr, Int, Ty, Nat, Vec, Elem, OPE, NeutralExpr, NormalExpr, forall, SingTy, STy, Any, SingContext, 'BaseTy, Eq, ChurchNumeralTy, ChurchNumeral, NFData, [Name], [Ty], 'Zero, 'Succ, '[], Bool},
   morekeywords=[2]{Z, S, True, case, of},
-  morekeywords=[3]{ctx, ty, arg, result, ctx1, ctx2, strong, weak, ctxV, ctx', ctxV', strongest, a, b, c, arg1, arg2},
+  morekeywords=[1]{ctx, ty, arg, result, ctx1, ctx2, strong, weak, ctxV, ctx', ctxV', strongest, arg1, arg2, A, B},
   mathescape=true,
   keepspaces=true,
   aboveskip=10pt,
   belowskip=10pt,
-  alsoletter={', [, ]}
+  alsoletter={'[]}
 }
 
 \newcommand{\code}{\lstinline}
+
 
 \begin{document}
 \definecolor{teal}{rgb}{0.0, 0.5, 0.5}
