@@ -105,46 +105,40 @@
 
 % {\bf A compulsory section, of at most $1$ page} 
 
-\noindent
-This section should pr\'{e}cis the project context, aims and objectives,
-and main contributions (e.g., deliverables) and achievements; the same 
-section may be called an abstract elsewhere.  The goal is to ensure the 
-reader is clear about what the topic is, what you have done within this 
-topic, {\em and} what your view of the outcome is.
+% \noindent
+% This section should pr\'{e}cis the project context, aims and objectives,
+% and main contributions (e.g., deliverables) and achievements; the same 
+% section may be called an abstract elsewhere.  The goal is to ensure the 
+% reader is clear about what the topic is, what you have done within this 
+% topic, {\em and} what your view of the outcome is.
+% 
+% The former aspects should be guided by your specification: essentially 
+% this section is a (very) short version of what is typically the first 
+% chapter.  Note that for research-type projects, this {\bf must} include 
+% a clear research hypothesis.  This will obviously differ significantly
+% for each project, but an example might be as follows:
 
-The former aspects should be guided by your specification: essentially 
-this section is a (very) short version of what is typically the first 
-chapter.  Note that for research-type projects, this {\bf must} include 
-a clear research hypothesis.  This will obviously differ significantly
-for each project, but an example might be as follows:
 
-\begin{quote}
-My research hypothesis is that a suitable genetic algorithm will yield
-more accurate results (when applied to the standard ACME data set) than 
-the algorithm proposed by Jones and Smith, while also executing in less
-time.
-\end{quote}
+My research hypothesis is that Haskell extensions are powerful enough to implement Normalisation by Evaluation for the Simply Typed Lambda Calculus. 
+
+\vspace{\baselineskip}
 
 \noindent
-The latter aspects should (ideally) be presented as a concise, factual 
-bullet point list.  Again the points will differ for each project, but 
-an might be as follows:
+The aims of this project are
+\begin{enumerate}
+    \item To produce various implementations of Normalisation by Evaluation in Haskell
+    \item To explore how successful modern features of Haskell are in implementing an algorithm with complex types.
+\end{enumerate}
 
-\begin{quote}
 \noindent
+In this project we
+
 \begin{itemize}
-\item I spent $120$ hours collecting material on and learning about the 
-      Java garbage-collection sub-system. 
-\item I wrote a total of $5000$ lines of source code, comprising a Linux 
-      device driver for a robot (in C) and a GUI (in Java) that is 
-      used to control it.
-\item I designed a new algorithm for computing the non-linear mapping 
-      from A-space to B-space using a genetic algorithm, see page $17$.
-\item I implemented a version of the algorithm proposed by Jones and 
-      Smith in [6], see page $12$, corrected a mistake in it, and 
-      compared the results with several alternatives.
+\item Implement two variations of Normalisation by Evaluation for the untyped lambda calculus in  Haskell, see Chapter \ref{chap:untypednbe}, following mathematical specifications.
+\item Translate an Agda implementation of Normalisation by Evaluation into Haskell using compiler extensions, see Chapter \ref{chap:typednbe}, which demonstrates that the research hypothesis was correct.
+\item Evaluate the practical use of the features enabled by compiler extensions, and recommend their use in instances where type-safety is the primary priority, see Chapter \ref{chap:evaluation}.
 \end{itemize}
-\end{quote}
+
 
 % -----------------------------------------------------------------------------
 
@@ -153,12 +147,9 @@ an might be as follows:
 % {\bf An optional section, of at most $1$ page}
 
 \noindent
-It is common practice (although totally optional) to acknowledge any
-third-party advice, contribution or influence you have found useful
-during your work.  Examples include support from friends or family, 
-the input of your Supervisor and/or Advisor, external organisations 
-or persons who  have supplied resources of some kind (e.g., funding, 
-advice or time), and so on.
+Thanks to Alex Kavvos for his guidance, support and concrete examples.
+\noindent
+Thanks also to the programming languages research group for listening to my presentation, and offering useful insights.
 
 % =============================================================================
 
@@ -202,24 +193,6 @@ advice or time), and so on.
 \backmatter
 
 \printbibliography
-
-% -----------------------------------------------------------------------------
-
-% The dissertation concludes with a set of (optional) appendicies; these are 
-% the same as chapters in a sense, but once signaled as being appendicies via
-% the associated macro, LaTeX manages them appropriatly.
-
-\appendix
-
-\chapter{An Example Appendix}
-\label{appx:example}
-
-Content which is not central to, but may enhance the dissertation can be 
-included in one or more appendicies.
-
-\noindent
-Note that in line with most research conferences, the marking panel is not
-obliged to read such appendices.
 
 % =============================================================================
 
