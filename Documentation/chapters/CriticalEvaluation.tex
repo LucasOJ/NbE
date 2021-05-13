@@ -101,18 +101,18 @@ The \code{addChurchNumeral} function applies the syntactic Church addition combi
 
 We developed a similar property for Church multiplication. Additionally, we verified that \code{normalise} can evaluate expressions constructed using the Church boolean encoding.
 
-\section{Evaluation of Language Features}
+\section{Evaluation of Compiler Extensions}
 
-In this section we evaluate how well Haskell's advanced language features worked during the implementation of NbE for the STLC. We also generalise our experiences to consider whether these features would be useful for general-purpose programming in Haskell, and what issues could prevent their use.
+In this section we evaluate how well Haskell's compiler extensions worked during the implementation of NbE for the STLC. We also generalise our experiences to consider whether their features would be useful for general-purpose programming in Haskell, and what issues could prevent their use.
 
-\subsection{GADTs}
+\subsection{Expressing Dependent Types with GADTs, DataKinds and PolyKinds}
 \label{subsect:GADTanalysis}
 
-We found that \code{GADTs} is an excellent extension for emulating dependent types when combined with \code{PolyKinds}. GADT syntax allowed us to define types such as \code{Expr} that would not be possible in standard Haskell. It also enabled us to translate Agda \code{data} definitions such as \code{OPE} and type generating functions such as $\text{Ty}^\text{N}$, that otherwise could not be expressed in Haskell. 
+We found that \code{GADTs} is an excellent extension for emulating dependent types when combined with \code{DataKinds} and \code{PolyKinds}. GADT syntax allowed us to define types such as \code{Expr} that would not be possible in standard Haskell. It also enabled us to translate Agda \code{data} definitions such as \code{OPE} and type generating functions such as $\text{Ty}^\text{N}$, that otherwise could not be expressed in Haskell. \code{DataKinds} enabled us to create non-standard kinds such as \code{Ty}, which encoded expressions at the type level. \code{PolyKinds} was necessary to write polymorphic kind signatures such as \elemcode{data Elem :: [a] -> a -> * }
 
 The NbE algorithm highlighted the mathematical rigour that GADTs allow us to encode in Haskell, such as proving the weakening property of the STLC using \code{strengthenNormal}, the transitivity of \code{OPE}s using \code{composeOPEs}, and the subject reduction property of \code{normalise}. We can be confident in the correctness of our implementation thanks to the programs as proofs perspective GADTs has awarded us. In cases where definitions were not correct, the types were not satisfied, providing a stronger layer of security against errors than standard Haskell. For example, modifying any of the cases in \code{strengthenElem} creates a type error.
 
-However, during the analysis and testing of our implementation, we found that GADTs indexed by types can create difficulties for deriving useful class instances. For example, it would be desirable for \code{NormalForm} to be a member of the \code{Eq} class, so that during testing we could directly check if two normal forms are equal (see Section \ref{section:testing}). 
+However, during the testing of our implementation, we found that GADTs indexed by types can create difficulties for deriving useful class instances. For example, it would be desirable for \code{NormalForm} to be a member of the \code{Eq} class, so that during testing we could directly check if two normal forms are equal (see Section \ref{section:testing}). 
 
 \begin{lstlisting}
     instance Eq (NeutralForm ctx ty) where
@@ -129,20 +129,21 @@ We attempted to benchmark the typed NbE implementation, to evaluate how much per
 
 In general, we believe that GADTs are a useful tool for Haskell developers to improve the type-safety of their programs by taking advantage of the programs as proof paradigm. However, the instance deriving limitation shows that the extension is not completely mature yet, and in cases where type-safety is not paramount, the additional effort GADTs require may outweigh the reward. 
 
-\subsection{Dependent Pattern Matching}
+\subsection{Dependent Pattern Matching with DataKinds}
 
-For our implementation, the class instance trick for performing dependent pattern matching on types worked well. Passing singleton class constraints through the program did add syntactic noise and required some thought, but passing constraints through function type signatures had no effect on the function implementations. 
+Pattern matching on a type is possible with standard Haskell class instances. However, the automatic promotion of values to the type level by \code{DataKinds} extension enabled us to represent more complex structures such as lists (see Section \ref{sect:opes}) at the type level. Class instances worked seamlessly with \code{DataKinds} promoted types to pattern match at the type level (see Section \ref{subsect:typedEvalAppCase}), similarly to a dependent pattern match. 
+
+Passing singleton class constraints through the program did add syntactic noise and required some thought, but passing constraints through function type signatures had no effect on the function implementations. 
 
 However, in some situations we were forced to add type constraints to data types themselves. For example, we had to add a \code{SingTy arg} constraint to the \code{Lam} constructor. This is more concerning, as the implementation guided the structure of the data. For our project this was not an issue, but such a constraint could have implications on other functions, which reduces the code's modularity. For example, any function which produces a \code{Lam} value would have to ensure the argument type is a member of \code{SingTy}, even though this constraint is not relevant for the expression itself.
 
-Our boilerplate overhead was small, since we only needed dependent pattern matches for a few functions. However, as noted in Section \ref{sect:typedNormalisation} for more complex applications with many dependent pattern matches, this boilerplate could become more difficult to manage. The boilerplate was also compact since our implementation only required pattern matches on the structure of types. For example, \code{idOpe} only depended on the length of the type-level context, so there was no need to identify its contents. This meant we only used a portion of the singleton pattern, which can be used to extract all the type-level information into the value level, at the cost of additional boilerplate.
+Our boilerplate overhead was small, since we only needed dependent pattern matches for a few functions. However, as noted in Section \ref{sect:typedNormalisation}, for more complex applications with many dependent pattern matches this boilerplate could become more difficult to manage. The boilerplate was also compact since our implementation only required pattern matches on the structure of types. For example, \code{idOpe} only depended on the length of the type-level context, so there was no need to identify its contents. This meant we only used a portion of the singleton pattern, which can be used to extract all the type-level information into the value level, at the cost of additional boilerplate.
 
-Richard Eisenberg's proposals for built-in dependent pattern matches using a syntax to similar Agda would be a much cleaner approach than \code{GADTs}, but the current solution for managing dependent pattern matches is the \code{singleton} library \cite{singletonLibrary}. This library uses template Haskell to automatically generate the instances and data types needed for “faking” dependent pattern matches, and would be useful for dependent pattern matching at scale.
+Richard Eisenberg's proposals for built-in dependent pattern matches using dependent quantifiers \cite{GADTs} (a syntax to similar Agda) would be a much cleaner approach than the singleton class trick, but the current solution for managing dependent pattern matches is the \code{singleton} library \cite{singletonLibrary}. This library uses template Haskell to automatically generate the instances and data types needed for “faking” dependent pattern matches, and would be useful for dependent pattern matching at scale.
 
-\subsection{Arbitrary-Rank Polymorphism}
+\subsection{Higher-Ranked Polymorphism with RankNTypes and ScopedTypeVariables}
 \label{subsect:rankNTypes}
 
-When defining the \code{Function} constructor of the STLC semantic set, we used explicit \code{forall} syntax to implement nested polymorphism. Whilst this satisfied most type requirements, when constructing concrete \code{Function} elements, GHC could not infer necessary type variable equalities to complete type-checking. We resolved this issue by using type annotations to bind type variables in function arguments. 
+When defining the \code{Function} constructor of the STLC semantic set, we used explicit \code{forall} syntax to implement “nested” polymorphism, which would not be possible without the \code{RankNTypes} extension. However, when constructing concrete \code{Function} elements, GHC could not infer necessary type variable equalities to complete type-checking. We resolved this issue by using type annotations to bind type variables in function arguments. To use type annotations, we enabled the \code{ScopedTypeVariables} extension.
 
-An interesting area for further study could be to identify why type inference was not able to derive the type variable equalities in these cases. We suspect that it could be due to the higher ranked polymorphism, as \code{Function} was the only definition in our implementation that made use of the \code{RankNTypes} extension. If this is the case, then the \code{RankNTypes} extension can reduce type-safety by introducing \code{Any} types, which can be satisfied with incorrect implementations.
-% TODO: Bring together thoughts
+An interesting area for further study could be to identify why type inference was not able to derive the type variable equalities in these cases. We suspect that it could be due to the higher ranked polymorphism, as \code{Function} was the only definition in our implementation that made use of the \code{RankNTypes} extension. If this is the case, then the \code{RankNTypes} extension can reduce type-safety by introducing \code{Any} types, which can be satisfied with incorrect implementations. Thus, we recommend pairing higher-ranked polymorphism with type annotations whenever it is used, at the cost of additional type boilerplate.

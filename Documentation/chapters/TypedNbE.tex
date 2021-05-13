@@ -31,6 +31,7 @@ We construct the set of the simply typed normal terms \code{NormalForm} by combi
 % TODO: Correspondence with untyped env, Motivate need for tracking type, ctxV
 
 \section{Order Preserving Embeddings}
+\label{sect:opes}
 
 Following Kovacs' implementation, before we can define the semantic set we need a datatype to represent Order Preserving Embeddings (OPEs) on contexts.
 
@@ -79,17 +80,26 @@ $\text{Ty}^\text{N}$ pattern matches on the type argument and is defined in two 
 Similarly, given a value of type \code{V ctx (A :-> B)}, GHC can deduce that the value must have the form \code{Function f}, since only the \code{Function} constructor can produce semantic values with function type. Again, we can extract a semantic value of the correct type since the type of \code{f} is exactly the type specified by the function type case of $\text{Ty}^\text{N}$. Thus, we have successfully mimicked the behaviour of $\text{Ty}^\text{N}$ in Haskell.
 
 % TODO: Limitations of above technique
+By default, in GHC, there is only have one “level” of polymorphism, where type variables are implicitly universally quantified. However, as seen in Figure \ref{fig:agdaSemanticSet}, we want to treat \code{ctx} as fixed, before quantifying over \code{ctx'}, where we use \code{ctx} instead of $\Gamma$ and \code{ctx'} instead of $\Delta$. To achieve this we use higher-ranked polymorphism with the explicit \code{forall} syntax to delay the quantification of \code{ctx'} until after \code{ctx} has been bound. The difference between 
 
-The argument to the \code{Function} constructor has following the type signature.
 \begin{lstlisting}
-    forall ctx' . OPE ctx' ctx -> V ctx' arg -> V ctx' result 
+    (OPE ctx' ctx -> V ctx' arg -> V ctx' result) -> V ctx (arg :-> result)
 \end{lstlisting}
 
-By default, in GHC, there is only have one “level” of polymorphism, where type variables are implicitly universally quantified. However, as seen in Figure \ref{fig:agdaSemanticSet}, we want to treat \code{ctx} as fixed, before quantifying over \code{ctx'}, where we use \code{ctx} instead of $\Gamma$ and \code{ctx'} instead of $\Delta$.
-% Those with OPE to original context
-To achieve this we use higher-ranked polymorphism with the explicit \code{forall} syntax to delay the quantification of \code{ctx'} until after \code{ctx} has been bound. To enable higher ranked polymorphism, we use the \code{Rank2Types} extension. 
+\noindent
+where \code{ctx'} is bound at the same time as \code{ctx}, and the higher-ranked type 
 
-The \code{OPE} parameter acts as a precondition requiring a proof that \code{ctx'} contains \code{ctx}, so intuitively this type quantifies over all contexts containing \code{ctx}.
+\begin{lstlisting}
+    (forall ctx' .  OPE ctx' ctx -> V ctx' arg -> V ctx' result) -> V ctx (arg :-> result)
+\end{lstlisting}
+
+\noindent
+is that we delay the binding of \code{ctx'} until after \code{ctx} has been bound, which is behaviour in Figure \ref{fig:agdaSemanticSet} we are trying to emulate. The \code{OPE} parameter acts as a precondition requiring a proof that \code{ctx'} contains \code{ctx}, so this type expresses that \code{f} can be any Haskell function which acts in any context larger than \code{ctx}, that takes a semantic value of type \code{arg} and produces a semantic value of type \code{result}. 
+
+% Those with OPE to original context
+ To enable higher ranked polymorphism, we use the \code{Rank2Types} extension. 
+
+
 
 % TODO: Justify use of OPE further? 
 
