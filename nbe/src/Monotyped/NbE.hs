@@ -36,7 +36,7 @@ deriving instance (Eq (Elem ctx ty))
 -- Syntactic typed DeBruijn expressions
 -- Each of the values is a term, and its type contains the typing context and type of the term
 data Expr :: [Ty] -> Ty -> * where
-    -- Given a proof the type ty is in the context ctx we know it's a variable??
+    -- Given a proof the type ty is in the context ctx we know it's a variable
     Var :: Elem ctx ty -> Expr ctx ty
     -- Given an expression and context, we can abstract out the first bound variable in the context to make a lambda
     Lam :: (SingTy arg) => Expr (arg ': ctx) result -> Expr ctx (arg :-> result)
@@ -118,7 +118,7 @@ strengthenEnv _   EmptyEnv         = EmptyEnv
 strengthenEnv ope (ConsEnv tail v) = ConsEnv (strengthenEnv ope tail) (strengthenV ope v)
 
 eval :: (SingContext ctxV) => Env ctx ctxV -> Expr ctx ty -> V ctxV ty
-eval env                   (Var n)                               = envLookup n env
+eval env (Var n) = envLookup n env
     where
         envLookup :: Elem ctx ty -> Env ctx ctxV -> V ctxV ty 
         envLookup Head     (ConsEnv _    v) = v

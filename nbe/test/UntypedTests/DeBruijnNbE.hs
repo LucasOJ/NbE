@@ -70,7 +70,6 @@ churchAnd = app2 andExpr
 churchOr :: DbExpr  -> DbExpr -> DbExpr
 churchOr = app2 orExpr
     where
-        -- We need ChurchBoolTy (ChurchBoolTy a) since first argument is a HOF
         orExpr :: DbExpr
         orExpr = DbLam (DbLam (app2 m k n))
 

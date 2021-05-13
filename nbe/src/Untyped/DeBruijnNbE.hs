@@ -38,8 +38,7 @@ eval env (DbVar x) = case lookup x env of
         -- Bound variable, returns the semantic value bound to x in the environment
         Just y -> y
 
-        -- Free variable, embed into semantics as is
-        -- TODO: What to do with free variables?
+        -- Free variable, embed into semantics with de Bruijn index at top-level expression
         Nothing -> Neutral (NeVFreeVar (x - size env))
 
 eval env (DbLam m) = Function f where

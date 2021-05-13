@@ -109,7 +109,6 @@ churchAnd m n = app2 andExpr m n
 churchOr :: Expr -> Expr -> Expr
 churchOr m n = app2 orExpr m n
     where
-        -- We need ChurchBoolTy (ChurchBoolTy a) since first argument is a HOF
         orExpr :: Expr
         orExpr = ExpLam v0' (ExpLam v1' (app2 v0 k v1))
 

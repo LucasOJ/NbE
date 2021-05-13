@@ -70,6 +70,29 @@ eval (ExpApp m n) env = app (eval m env) (eval n env)
         -- Since eval calls app it would also require state
         app (Neutral n)  v = Neutral (NeVApp n v)
 
+reify :: V -> [Name] -> NormalForm
+reify (Neutral n)  freshVars = NfNeutralForm (reifyNeutral n freshVars)
+    where 
+        reifyNeutral :: NeutralV -> [Name] -> NeutralForm
+        reifyNeutral (NeVVar i)   freshVars = NeVar i
+        reifyNeutral (NeVApp n m) freshVars = NeApp reifiedN reifiedM
+            where
+                reifiedN = reifyNeutral n freshVars
+                reifiedM = reify m freshVars
+reify (Function f) (v:vs)   = NfLam v body
+    where 
+        body = reify (f (Neutral (NeVVar v))) vs
+    
+normalise :: Expr -> NormalForm
+normalise exp = reify (eval exp Map.empty) freshNames
+    where
+        freshNames = (getFreshVariableStream . getFreeVariables) exp
+
+normaliseToExpr :: Expr -> Expr
+normaliseToExpr = normalToExpr . normalise
+
+--- Alternative State monad implementation
+
 -- Converts a sematic representation of a term into it's associated normal form
 reify' :: V -> FreshName NormalForm
 reify' (Neutral n)  = do 
@@ -94,28 +117,7 @@ reifyNeutral' (NeVApp n m) = do
     reifiedNormal  <- reify' m
     return (NeApp reifiedNeutral reifiedNormal) 
 
-reify :: V -> [Name] -> NormalForm
-reify (Neutral n)  freshVars = NfNeutralForm (reifyNeutral n freshVars)
-    where 
-        reifyNeutral :: NeutralV -> [Name] -> NeutralForm
-        reifyNeutral (NeVVar i)   freshVars = NeVar i
-        reifyNeutral (NeVApp n m) freshVars = NeApp reifiedN reifiedM
-            where
-                reifiedN = reifyNeutral n freshVars
-                reifiedM = reify m freshVars
-reify (Function f) (v:vs)   = NfLam v body
-    where 
-        body = reify (f (Neutral (NeVVar v))) vs
-    
-normalise :: Expr -> NormalForm
-normalise exp = reify (eval exp Map.empty) freshNames
-    where
-        freshNames = (getFreshVariableStream . getFreeVariables) exp
-
-normaliseToExpr' :: Expr -> Expr
-normaliseToExpr' = normalToExpr . normalise'
-
--- 'reify reifies the semantic form into its canonical normal form
+-- 'reify' reifies the semantic form into its canonical normal form
 -- 'evalState' returns the normal form of exp at the initial state (the stream of initially fresh variables for exp) 
 normalise' :: Expr -> NormalForm
 normalise' exp = evalState (reify' (eval exp Map.empty)) freshNames 
@@ -123,8 +125,8 @@ normalise' exp = evalState (reify' (eval exp Map.empty)) freshNames
         -- Generates the fresh name stream for exp
         freshNames = (getFreshVariableStream . getFreeVariables) exp
 
-normaliseToExpr :: Expr -> Expr
-normaliseToExpr = normalToExpr . normalise
+normaliseToExpr' :: Expr -> Expr
+normaliseToExpr' = normalToExpr . normalise'
 
 --- Display
 

@@ -22,7 +22,7 @@ normalise env (ExpVar x) = case lookup x env of
 normalise env (ExpLam x body) = ExpLam x (normalise env body)
 
 normalise env (ExpApp m n) | isRedex expr' = normalise env expr'
-                            -- Evalulating inside and App may introduce a new redex
+                            -- Evalulating inside an App may introduce a new redex
 
                            | otherwise = expr'
     where
