@@ -86,14 +86,14 @@ data Exp a where
 
 deriving instance (Show (Exp a))
 
-instance Eq (NormalForm ctx ty) where
-    (NormalNeutral n) == (NormalNeutral m) = n == m
-    (NormalLam n) == (NormalLam m) = n == m
-    _ == _ = False
-
-instance Eq (NeutralForm ctx ty) where
-    (NeutralVar n) == (NeutralVar m) = n == m
-    (==) (NeutralApp (n :: NeutralForm ctx (arg1 :-> ty)) m) 
-         (NeutralApp (x :: NeutralForm ctx (arg2 :-> ty)) y) 
-          = n == x && m == y 
-    _ == _ = False
+-- instance Eq (NormalForm ctx ty) where
+--     (NormalNeutral n) == (NormalNeutral m) = n == m
+--     (NormalLam n) == (NormalLam m) = n == m
+--     _ == _ = False
+-- 
+-- instance Eq (NeutralForm ctx ty) where
+--     (NeutralVar n) == (NeutralVar m) = n == m
+--     (==) (NeutralApp (n :: NeutralForm ctx (arg1 :-> ty)) m) 
+--          (NeutralApp (x :: NeutralForm ctx (arg2 :-> ty)) y) 
+--           = n == x && m == y 
+--     _ == _ = False

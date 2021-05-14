@@ -14,7 +14,7 @@ NbE proceeds by interpreting terms of the lambda calculus (referred to as “syn
 NbE is a modern alternative to normalisation by reduction; a technique based on syntactic rewriting. NbE is useful for the following reasons.
 
 \begin{enumerate}
-    \item Since the foundations of NbE are mathematical, we can prove that our implementation is correct and study its behaviour formally \cite{AgdaNbe}. Proving that the implementations are fully correct is beyond the scope of this project, but we use types as machine-checked proof that our implementation satisfies certain properties.
+    \item Since the foundations of NbE are mathematical, we can prove that our implementation is correct and study its behaviour formally \cite{AgdaNbe}. Proving that each implementation is fully correct is beyond the scope of this project, but we use types as machine-checked proof that our implementations satisfy certain properties.
     \item Some research suggests that NbE can improve the speed of compilation of functional languages \cite{efficientNbE}.
     \item Research is ongoing into whether dependent type theories such as Coq can use NbE to check for equality between dependent types by normalising type-level programs \cite{deBruijn}
 \end{enumerate}
@@ -25,7 +25,7 @@ To become familiar with the general operation of NbE, in Chapter \ref{chap:untyp
 Then we move to the central challenge of this project: translating an Agda implementation of NbE for the Simply Typed Lambda Calculus (STLC) into Haskell. The Agda implementation we follow makes use of advanced type-level features such as dependent types and dependent pattern matching \cite{agdaUserGuide}. However, Agda is currently unsuitable for general-purpose programming for the following reasons
 
 \begin{enumerate}
-    \item It is a type theory and proof assistant primarily, rather than a general-purpose programming language
+    \item It is a type theory and proof assistant primarily, rather than a general-purpose programming language \cite{agdaUserGuide}
     \item It has a steep learning curve due to the theoretical understanding required to develop programs
     \item The community supporting it is small and mainly academic
 \end{enumerate}
@@ -40,5 +40,5 @@ In Chapter \ref{chap:typednbe} we implement the well-typed normalisation functio
 The aims of this project are:
 \begin{enumerate}
     \item To produce various implementations of NbE in Haskell
-    \item To explore how successful modern features of Haskell are in implementing an algorithm with complex types.
+    \item To explore how successful and practical modern features of Haskell are in implementing an algorithm with complex types
 \end{enumerate}

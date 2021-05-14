@@ -98,14 +98,13 @@ The additional type precision awarded by GADTs moves errors from run-time to com
 
 \newcommand{\elemcode}{\lstinline[morekeywords={a, [a], x, xs, y}]}
 
-Before using GADTs to construct the set of well-typed expressions, we first define the \code{Elem} GADT. A value of type \elemcode{Elem xs x} is a proof that the type \elemcode{x} is an element of the list of types \elemcode{xs}. 
+Before using GADTs to construct the set of well-typed expressions, we first define the \code{Elem} GADT. A value of type \elemcode{Elem xs x} is a proof that the type \elemcode{x} is an element of the list of types \elemcode{xs}. \cite{GADTs} 
 
 \begin{lstlisting}[morekeywords={a, [a], x, xs, y}]
     data Elem :: [a] -> a -> * where
         Head :: Elem (x ': xs) x
         Tail :: Elem xs x -> Elem (y ': xs) x
 \end{lstlisting}
-\cite{GADTs}
 
 The \elemcode{Head} constructor produces a proof that \elemcode{x} is an element of any list beginning with \elemcode{x}. Given a value of type \elemcode{Elem xs x}, the \elemcode{Tail} constructor produces a proof that \elemcode{x} is an element of the extended list \elemcode{y:xs} for any element \elemcode{y}. For example, the value \elemcode{Tail Head} could have type \code{Elem '["a","b","c","d"] "b"} or type \elemcode{Elem '[4, 5] 5}. 
 
@@ -147,7 +146,7 @@ The \code{Elem} value with $n$ tail constructors refers to $n$th most recently b
 
 % TODO: Reword above
 
-The \code{Lam} constructor corresponds to the abstraction typing judgement rule. Given a well-typed expression of type \code{result} in the context \code{arg:ctx}, we can abstract out the first variable of context into a bound variable with a lambda expression, producing a new term with the function type \code{arg :-> result} in the weakened context \code{ctx}. We refer to the argument of the \code{Lam} constructor as the body of the lambda.
+The \code{Lam} constructor corresponds to the abstraction typing judgement rule. Given a well-typed expression of type \code{result} in the context \code{arg:ctx}, we can abstract out the first variable of the context into a bound variable with a lambda expression, producing a new term with the function type \code{arg :-> result} in the weakened context \code{ctx}. We refer to the argument of the \code{Lam} constructor as the body of the lambda.
 
 The \code{App} constructor corresponds directly to the application typing judgement rule, where we can apply one term to another if they share the same context \code{ctx} and the type of the second term matches the argument type \code{arg} of the first term.
 
@@ -155,7 +154,7 @@ Using this implementation for \code{Expr}, it is guaranteed that an expression o
 
 % TODO: Input/Ouput type as pre-condition/post-condition (eg empty context), programs as proof
 
-Note that the apostrophes on type-level constructors are not required for successful compilation, as GHC can infer whether the constructor is type-level or value-level automatically. From this point we omit the apostrophe unless it ambiguous whether a constructor operates at the value-level or type-level.
+Note that the apostrophes on type-level constructors are not required for successful compilation, as GHC can infer whether the constructor is type-level or value-level automatically. From this point we omit the apostrophe unless it ambiguous whether a constructor operates at the value level or type level.
 % TODO: Useful for getting started, now bulky, omit for remainer of dissertation
 
 
